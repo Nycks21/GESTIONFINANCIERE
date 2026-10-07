@@ -1,4 +1,4 @@
-﻿﻿using System;
+﻿﻿﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
@@ -10,6 +10,23 @@ using System.Linq;
 using System.Security.Cryptography;
 using System.Text;
 
+/// <summary>
+/// AuthHelper — SOCLE DE SÉCURITÉ UNIQUE
+/// ------------------------------------------------------------
+/// Contient :
+///   - Session (VerifySession, ValidateSessionToken, ForceLogout, Logout)
+///   - Garde-fous API (RequireApiAuth, RequirePermission, RequireCsrfSafePost...)
+///   - CSRF (token, validation, meta tag)
+///   - Rôles (IsSuperAdmin, IsAdmin, ...)
+///   - Permissions (HasPermission, SaveUserPermissions, ...)
+///   - Licence (CheckLicence, GetExpirationDateString, ...)
+///   - Widgets layout (RenderUserProfileHTML, RenderTopBarHTML, RenderControlSidebarHTML)
+///   - DTO partagé MenuItem (utilisé par AuthHelperDashboard / Finance / Stock)
+///
+/// NE CONTIENT PAS (délégué aux modules) :
+///   - AllMenus, CheckboxIdByCode, SectionIcons, EmojiByCode
+///   - GetCheckboxId, RenderPermissionsUI, GetAuthorizedMenus, RenderMenuHTML
+/// </summary>
 public static class AuthHelper
 {
   // ============================================================
@@ -22,10 +39,6 @@ public static class AuthHelper
   private const string SK_USERROLE = "USERROLE";
   private const string SK_SESSION_TOKEN = "SESSION_TOKEN";
   private const string SK_USER_PERMISSIONS = "USER_PERMISSIONS";
-
-  // ============================================================
-  // ✅ CSRF — Constantes
-  // ============================================================
   private const string SK_CSRF_TOKEN = "CSRF_TOKEN";
   private const string CSRF_HEADER_NAME = "X-CSRF-Token";
 
@@ -34,380 +47,17 @@ public static class AuthHelper
     try
     {
       var connSetting = ConfigurationManager.ConnectionStrings["MaConnexion"];
-      if (connSetting != null)
-      {
-        connStr = connSetting.ConnectionString;
-        if (connStr == null) connStr = "";
-      }
-      else
-      {
-        connStr = "";
-      }
+      connStr = connSetting != null && connSetting.ConnectionString != null
+          ? connSetting.ConnectionString
+          : "";
     }
-    catch
-    {
-      connStr = "";
-    }
+    catch { connStr = ""; }
   }
 
-  public static string ConnectionString
-  {
-    get { return connStr; }
-  }
+  public static string ConnectionString { get { return connStr; } }
 
   // ============================================================
-  // VÉRIFICATION D'AUTHENTIFICATION
-  // ============================================================
-  public static bool IsAuthenticated(HttpContext context)
-  {
-    if (context == null || context.Session == null)
-      return false;
-
-    return context.Session[SK_AUTHENTICATED] != null &&
-           (bool)context.Session[SK_AUTHENTICATED];
-  }
-
-  // ============================================================
-  // GARDE-FOU UNIFIÉ POUR LES HANDLERS .ASHX
-  // ============================================================
-  public static bool RequireApiAuth(HttpContext context, int minRole = -1)
-  {
-    if (context == null || context.Session == null)
-      return false;
-
-    if (context.Session[SK_AUTHENTICATED] == null || !(bool)context.Session[SK_AUTHENTICATED])
-      return false;
-
-    if (!ValidateSessionToken(context))
-      return false;
-
-    if (minRole >= 0)
-    {
-      int userRole = GetUserRole(context);
-      if (userRole == 0) return true;
-      if (userRole > minRole) return false;
-    }
-
-    return true;
-  }
-
-  public static bool RequirePermission(HttpContext context, string permissionCode)
-  {
-    if (context == null || context.Session == null)
-      return false;
-
-    if (context.Session[SK_AUTHENTICATED] == null || !(bool)context.Session[SK_AUTHENTICATED])
-      return false;
-
-    if (!ValidateSessionToken(context))
-      return false;
-
-    return HasPermission(permissionCode);
-  }
-
-  public static bool CanManageEmploi(HttpContext context)
-  {
-    if (context == null || context.Session == null)
-      return false;
-
-    int userRole = GetUserRole(context);
-    return userRole == 0 || userRole == 1;
-  }
-
-  // ============================================================
-  // ✅ CSRF PROTECTION — Token, validation, meta tag
-  // ============================================================
-
-  /// <summary>
-  /// Retourne le token CSRF de la session courante, en le créant si absent.
-  /// Le token = 32 octets aléatoires (RNG cryptographique) en Base64 URL-safe.
-  /// Durée de vie = celle de la session (pas de rotation).
-  /// </summary>
-  public static string GetOrCreateCsrfToken()
-  {
-    var session = HttpContext.Current != null ? HttpContext.Current.Session : null;
-    if (session == null) return "";
-
-    if (session[SK_CSRF_TOKEN] == null)
-    {
-      session[SK_CSRF_TOKEN] = GenerateCsrfToken();
-    }
-    return session[SK_CSRF_TOKEN].ToString();
-  }
-
-  /// <summary>
-  /// Génère un token aléatoire cryptographiquement sûr.
-  /// </summary>
-  private static string GenerateCsrfToken()
-  {
-    byte[] buffer = new byte[32];
-    using (var rng = new RNGCryptoServiceProvider())
-    {
-      rng.GetBytes(buffer);
-    }
-    // Base64 URL-safe (évite + / = qui gênent dans les headers)
-    return Convert.ToBase64String(buffer)
-        .Replace("+", "-")
-        .Replace("/", "_")
-        .Replace("=", "");
-  }
-
-  /// <summary>
-  /// Vérifie que le header X-CSRF-Token correspond au token stocké en session.
-  /// Retourne false si absent ou invalide.
-  /// </summary>
-  public static bool ValidateCsrfToken(HttpContext context)
-  {
-    if (context == null || context.Session == null) return false;
-
-    string sessionToken = context.Session[SK_CSRF_TOKEN] as string;
-    if (string.IsNullOrEmpty(sessionToken))
-    {
-      LogAuthError("ValidateCsrfToken: aucun token en session");
-      return false;
-    }
-
-    // Le header peut arriver en "X-CSRF-Token" ou "HTTP_X_CSRF_TOKEN"
-    string headerToken = context.Request.Headers[CSRF_HEADER_NAME];
-    if (string.IsNullOrEmpty(headerToken))
-      headerToken = context.Request.Headers["HTTP_X_CSRF_TOKEN"];
-
-    if (string.IsNullOrEmpty(headerToken))
-    {
-      LogAuthError("ValidateCsrfToken: aucun header X-CSRF-Token");
-      return false;
-    }
-
-    // Comparaison à temps constant (anti timing-attack)
-    return FixedTimeEquals(sessionToken, headerToken);
-  }
-
-  /// <summary>
-  /// Comparaison de chaînes à temps constant.
-  /// Évite les attaques par mesure de temps (timing attacks).
-  /// </summary>
-  private static bool FixedTimeEquals(string a, string b)
-  {
-    if (a == null || b == null) return false;
-    if (a.Length != b.Length) return false;
-
-    int diff = 0;
-    for (int i = 0; i < a.Length; i++)
-    {
-      diff |= a[i] ^ b[i];
-    }
-    return diff == 0;
-  }
-
-  /// <summary>
-  /// Vérifie que la requête provient d'une origine de confiance
-  /// (Origin ou Referer doit pointer vers le host courant).
-  /// Défense en profondeur complémentaire au token.
-  /// </summary>
-  public static bool ValidateOrigin(HttpContext context)
-  {
-    if (context == null || context.Request == null) return false;
-
-    string host = context.Request.Url != null ? context.Request.Url.Host : null;
-    if (string.IsNullOrEmpty(host)) return false;
-
-    string origin = context.Request.Headers["Origin"];
-    if (!string.IsNullOrEmpty(origin))
-    {
-      try
-      {
-        var uri = new Uri(origin);
-        return string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase);
-      }
-      catch { return false; }
-    }
-
-    string referer = context.Request.Headers["Referer"];
-    if (!string.IsNullOrEmpty(referer))
-    {
-      try
-      {
-        var uri = new Uri(referer);
-        return string.Equals(uri.Host, host, StringComparison.OrdinalIgnoreCase);
-      }
-      catch { return false; }
-    }
-
-    // Ni Origin ni Referer : suspect en POST
-    LogAuthError("ValidateOrigin: ni Origin ni Referer");
-    return false;
-  }
-
-  /// <summary>
-  /// Garde-fou unifié pour les handlers mutateurs :
-  ///   1. Session valide (RequireApiAuth)
-  ///   2. Token CSRF valide
-  ///   3. Origin / Referer de confiance
-  /// À utiliser à la place de RequireApiAuth dans TOUS les handlers
-  /// qui font des actions mutantes (POST/DELETE/PUT).
-  /// </summary>
-  public static bool RequireCsrfSafePost(HttpContext context, int minRole = -1)
-  {
-    if (!RequireApiAuth(context, minRole)) return false;
-    if (!ValidateCsrfToken(context)) return false;
-    if (!ValidateOrigin(context)) return false;
-    return true;
-  }
-
-  // ============================================================
-  // ✅ AUTORISATION FINE : permission simple ou resource.action
-  // ============================================================
-
-  /// <summary>
-  /// Garde-fou unifié : CSRF-safe + vérification de permission.
-  /// À utiliser à la place de RequireCsrfSafePost(ctx, -1) dans TOUS les
-  /// handlers qui touchent à une ressource métier.
-  /// Exemple : RequireCsrfPermission(ctx, "articles")
-  /// </summary>
-  public static bool RequireCsrfPermission(HttpContext context, string permissionCode)
-  {
-    if (!RequireCsrfSafePost(context, -1)) return false;
-    return HasPermission(permissionCode);
-  }
-
-  /// <summary>
-  /// Garde-fou unifié avec permission fine (resource.action).
-  /// Vérifie d'abord "resource.action" (ex: "articles.delete"),
-  /// puis fallback sur "resource" pour compatibilité avec les
-  /// permissions menu existantes (ex: "articles").
-  ///
-  /// Exemple : RequireCsrfPermission(ctx, "articles", "delete")
-  /// </summary>
-  public static bool RequireCsrfPermission(HttpContext context, string resource, string action)
-  {
-    if (!RequireCsrfSafePost(context, -1)) return false;
-
-    // 1) Permission fine (ex: articles.delete)
-    if (!string.IsNullOrEmpty(action) && HasPermission(resource + "." + action))
-      return true;
-
-    // 2) Fallback : permission de base (ex: articles)
-    return HasPermission(resource);
-  }
-
-  /// <summary>
-  /// Vérification SANS CSRF — pour les handlers GET (lecture seule).
-  /// Exemple : RequireApiPermission(ctx, "utilisateurs")
-  /// </summary>
-  public static bool RequireApiPermission(HttpContext context, string permissionCode)
-  {
-    if (!RequireApiAuth(context, -1)) return false;
-    return HasPermission(permissionCode);
-  }
-
-  /// <summary>
-  /// Injecte le token CSRF dans le HTML sous forme de meta tag.
-  /// À appeler dans le &lt;head&gt; de chaque page .aspx :
-  ///   &lt;%= AuthHelper.RenderCsrfMetaTag() %&gt;
-  /// </summary>
-  public static string RenderCsrfMetaTag()
-  {
-    try
-    {
-      string token = GetOrCreateCsrfToken();
-      return "<meta name=\"csrf-token\" content=\"" +
-             HttpUtility.HtmlAttributeEncode(token) + "\">";
-    }
-    catch (Exception ex)
-    {
-      LogAuthError("RenderCsrfMetaTag: " + ex.Message);
-      return "";
-    }
-  }
-
-  // ============================================================
-  // C4 — TRANSFERT D'AUTHENTIFICATION ENTRE SESSIONS
-  // ------------------------------------------------------------
-  // Utilisé pour régénérer le SessionId après login (anti session fixation).
-  // Les données sont stockées en Cache serveur pendant 60s avec un
-  // token à usage unique.
-  // ============================================================
-  private const string AUTH_TRANSFER_CACHE_PREFIX = "AUTH_TRANSFER_";
-
-  public static string StorePendingAuth(System.Collections.Generic.Dictionary<string, object> authData)
-  {
-    string token = Guid.NewGuid().ToString("N");
-    System.Web.HttpRuntime.Cache.Insert(
-        AUTH_TRANSFER_CACHE_PREFIX + token,
-        authData,
-        null,
-        DateTime.Now.AddSeconds(60),
-        System.Web.Caching.Cache.NoSlidingExpiration
-    );
-    return token;
-  }
-
-  public static System.Collections.Generic.Dictionary<string, object> RetrievePendingAuth(string token)
-  {
-    if (string.IsNullOrEmpty(token)) return null;
-    string key = AUTH_TRANSFER_CACHE_PREFIX + token;
-    var data = System.Web.HttpRuntime.Cache[key] as System.Collections.Generic.Dictionary<string, object>;
-    if (data != null) System.Web.HttpRuntime.Cache.Remove(key);
-    return data;
-  }
-
-  // ============================================================
-  // VÉRIFICATION DU TOKEN DE SESSION EN BASE
-  // ============================================================
-  private static bool ValidateSessionToken(HttpContext context)
-  {
-    try
-    {
-      int userId = GetUserId(context);
-      string sessionToken = context.Session[SK_SESSION_TOKEN] as string;
-
-      if (userId <= 0 || string.IsNullOrEmpty(sessionToken))
-      {
-        LogAuthError("ValidateSessionToken: userId ou token manquant (userId=" + userId + ")");
-        return false;
-      }
-
-      if (string.IsNullOrEmpty(connStr))
-      {
-        LogAuthError("ValidateSessionToken: chaîne de connexion vide");
-        return false;
-      }
-
-      using (SqlConnection conn = new SqlConnection(connStr))
-      {
-        conn.Open();
-        string sql = "SELECT COUNT(*) FROM USERS WHERE IDUSER = @userId AND SESSION_TOKEN = @token";
-        using (SqlCommand cmd = new SqlCommand(sql, conn))
-        {
-          cmd.Parameters.AddWithValue("@userId", userId);
-          cmd.Parameters.AddWithValue("@token", sessionToken);
-          int count = (int)cmd.ExecuteScalar();
-          if (count == 0)
-            LogAuthError("ValidateSessionToken: token invalide pour userId=" + userId);
-          return count > 0;
-        }
-      }
-    }
-    catch (Exception ex)
-    {
-      LogAuthError("ValidateSessionToken exception: " + ex.Message);
-      return false;
-    }
-  }
-
-  private static void LogAuthError(string message)
-  {
-    try
-    {
-      string logFile = HttpContext.Current.Server.MapPath("~/App_Data/auth_token.log");
-      System.IO.File.AppendAllText(logFile,
-          string.Format("[{0}] {1}\n", DateTime.Now, message));
-    }
-    catch { }
-  }
-
-  // ============================================================
-  // STRUCTURE D'UN MENU
+  // DTO PARTAGÉ (utilisé par les modules de menus)
   // ============================================================
   public class MenuItem
   {
@@ -419,199 +69,234 @@ public static class AuthHelper
     public int Order { get; set; }
     public List<MenuItem> Children { get; set; }
 
-    public MenuItem()
-    {
-      Children = new List<MenuItem>();
-    }
+    public MenuItem() { Children = new List<MenuItem>(); }
   }
 
   // ============================================================
-  // DÉFINITION DES MENUS
-  // (Text et Section = clés i18n, résolues par LocalizationHelper)
+  // AUTHENTIFICATION
   // ============================================================
-  public static readonly List<MenuItem> AllMenus = new List<MenuItem>
-    {
-        new MenuItem { Code = "accueil",      Text = "menu.accueil",      Url = "/pages/accueil/index.aspx",                                 Icon = "fas fa-chalkboard",     Section = "section.accueil",        Order = 1  },
-        new MenuItem { Code = "unites",       Text = "menu.unites",       Url = "/pages/parametres/unites/unites.aspx",                      Icon = "fas fa-ruler",          Section = "section.parametres",     Order = 2  },
-        new MenuItem { Code = "categories",   Text = "menu.categories",   Url = "/pages/parametres/categories/categories.aspx",              Icon = "fas fa-tags",           Section = "section.parametres",     Order = 3  },
-        new MenuItem { Code = "fournisseurs", Text = "menu.fournisseurs", Url = "/pages/parametres/fournisseurs/fournisseurs.aspx",          Icon = "fas fa-truck",          Section = "section.parametres",     Order = 4  },
-        new MenuItem { Code = "emplacements", Text = "menu.emplacements", Url = "/pages/parametres/emplacements/emplacements.aspx",          Icon = "fas fa-map-marker-alt", Section = "section.parametres",     Order = 5  },
-        new MenuItem { Code = "articles",     Text = "menu.articles",     Url = "/pages/modules/articles/articles.aspx",                     Icon = "fas fa-boxes",          Section = "section.mouvements",     Order = 6  },
-        new MenuItem { Code = "entrees",      Text = "menu.entrees",      Url = "/pages/modules/entrees/entrees.aspx",                       Icon = "fas fa-arrow-down",     Section = "section.mouvements",     Order = 7  },
-        new MenuItem { Code = "sorties",      Text = "menu.sorties",      Url = "/pages/modules/sorties/sorties.aspx",                       Icon = "fas fa-arrow-up",       Section = "section.mouvements",     Order = 8  },
-        new MenuItem { Code = "stock",        Text = "menu.stock",        Url = "/pages/modules/stock/stock.aspx",                           Icon = "fas fa-warehouse",      Section = "section.mouvements",     Order = 9  },
-        new MenuItem { Code = "saisies",      Text = "menu.saisies",      Url = "/pages/demandes/saisie/saisies.aspx",                       Icon = "fas fa-file-alt",       Section = "section.demandes",       Order = 10 },
-        new MenuItem { Code = "accuses",      Text = "menu.accuses",      Url = "/pages/demandes/accuse/accuses.aspx",                       Icon = "fas fa-check-circle",   Section = "section.demandes",       Order = 11 },
-        new MenuItem { Code = "exploitation", Text = "menu.exploitation", Url = "/pages/exploitations/exp/exploitations.aspx",               Icon = "fas fa-chart-bar",      Section = "section.rapports",       Order = 12 },
-        new MenuItem { Code = "resetpwd",     Text = "menu.resetpwd",     Url = "/pages/administrations/reset/resetpwd.aspx",                Icon = "fas fa-key",            Section = "section.administration", Order = 13 },
-        new MenuItem { Code = "utilisateurs", Text = "menu.utilisateurs", Url = "/pages/administrations/utilisateur/utilisateur.aspx",       Icon = "fas fa-user-cog",       Section = "section.administration", Order = 14 },
-        new MenuItem { Code = "requetes",     Text = "menu.requetes",     Url = "/pages/administrations/requete/requetes.aspx",              Icon = "fas fa-terminal",       Section = "section.administration", Order = 15 },
-    };
-
-  // ============================================================
-  // MAPPINGS UI POUR LA GÉNÉRATION DYNAMIQUE DES PERMISSIONS
-  // ============================================================
-
-  /// <summary>
-  /// Mapping Code MenuItem → id HTML de la checkbox.
-  /// Doit rester synchronisé avec CHECKBOX_ID_MAP dans config.js.
-  /// </summary>
-  public static readonly Dictionary<string, string> CheckboxIdByCode = new Dictionary<string, string>
-    {
-        { "accueil",      "permDashboard"    },
-        { "unites",       "permUnites"       },
-        { "categories",   "permCategories"   },
-        { "fournisseurs", "permFournisseurs" },
-        { "emplacements", "permEmplacements" },
-        { "articles",     "permArticles"     },
-        { "entrees",      "permEntrees"      },
-        { "sorties",      "permSorties"      },
-        { "stock",        "permStock"        },
-        { "saisies",      "permSaisies"      },
-        { "accuses",      "permAccuses"      },
-        { "exploitation", "permExploitation" },
-        { "resetpwd",     "permResetpwd"     },
-        { "utilisateurs", "permUser"         },
-        { "requetes",     "permRequetes"     }
-    };
-
-  /// <summary>
-  /// Mapping Section i18n → icône FontAwesome (en-tête de bloc).
-  /// </summary>
-  private static readonly Dictionary<string, string> SectionIcons = new Dictionary<string, string>
-    {
-        { "section.accueil",        "fas fa-chalkboard"   },
-        { "section.parametres",     "fas fa-sliders-h"    },
-        { "section.mouvements",     "fas fa-exchange-alt" },
-        { "section.demandes",       "fas fa-inbox"        },
-        { "section.rapports",       "fas fa-chart-bar"    },
-        { "section.administration", "fas fa-shield-alt"   }
-    };
-
-  /// <summary>
-  /// Mapping Code MenuItem → emoji cosmétique (affiché avant le libellé).
-  /// </summary>
-  private static readonly Dictionary<string, string> EmojiByCode = new Dictionary<string, string>
-    {
-        { "accueil",      "📊" }, { "unites",       "📏" },
-        { "categories",   "📅" }, { "fournisseurs", "📄" },
-        { "emplacements", "📦" }, { "articles",     "👥" },
-        { "entrees",      "📆" }, { "sorties",      "⏰" },
-        { "stock",        "🛒" }, { "saisies",      "✏️" },
-        { "accuses",      "🎵" }, { "exploitation", "🚪" },
-        { "resetpwd",     "🔑" }, { "utilisateurs", "📖" },
-        { "requetes",     "💻" }
-    };
-
-  /// <summary>
-  /// Retourne l'id HTML d'une checkbox à partir du Code MenuItem.
-  /// Fallback : "perm_" + code.
-  /// </summary>
-  public static string GetCheckboxId(string menuCode)
+  public static bool IsAuthenticated(HttpContext context)
   {
-    if (string.IsNullOrEmpty(menuCode)) return "";
-    return CheckboxIdByCode.ContainsKey(menuCode)
-        ? CheckboxIdByCode[menuCode]
-        : "perm_" + menuCode;
+    if (context == null || context.Session == null) return false;
+    return context.Session[SK_AUTHENTICATED] != null &&
+           (bool)context.Session[SK_AUTHENTICATED];
   }
 
   // ============================================================
-  // ✅ GÉNÉRATION DYNAMIQUE DU BLOC PERMISSIONS (UI)
+  // GARDE-FOUS API
   // ============================================================
-  public static string RenderPermissionsUI()
+  public static bool RequireApiAuth(HttpContext context, int minRole = -1)
+  {
+    if (context == null || context.Session == null) return false;
+    if (context.Session[SK_AUTHENTICATED] == null || !(bool)context.Session[SK_AUTHENTICATED]) return false;
+    if (!ValidateSessionToken(context)) return false;
+
+    if (minRole >= 0)
+    {
+      int userRole = GetUserRole(context);
+      if (userRole == 0) return true;
+      if (userRole > minRole) return false;
+    }
+    return true;
+  }
+
+  public static bool RequirePermission(HttpContext context, string permissionCode)
+  {
+    if (context == null || context.Session == null) return false;
+    if (context.Session[SK_AUTHENTICATED] == null || !(bool)context.Session[SK_AUTHENTICATED]) return false;
+    if (!ValidateSessionToken(context)) return false;
+    return HasPermission(permissionCode);
+  }
+
+  public static bool CanManageEmploi(HttpContext context)
+  {
+    if (context == null || context.Session == null) return false;
+    int userRole = GetUserRole(context);
+    return userRole == 0 || userRole == 1;
+  }
+
+  // ============================================================
+  // CSRF
+  // ============================================================
+  public static string GetOrCreateCsrfToken()
+  {
+    var session = HttpContext.Current != null ? HttpContext.Current.Session : null;
+    if (session == null) return "";
+    if (session[SK_CSRF_TOKEN] == null) session[SK_CSRF_TOKEN] = GenerateCsrfToken();
+    return session[SK_CSRF_TOKEN].ToString();
+  }
+
+  private static string GenerateCsrfToken()
+  {
+    byte[] buffer = new byte[32];
+    using (var rng = new RNGCryptoServiceProvider()) rng.GetBytes(buffer);
+    return Convert.ToBase64String(buffer).Replace("+", "-").Replace("/", "_").Replace("=", "");
+  }
+
+  public static bool ValidateCsrfToken(HttpContext context)
+  {
+    if (context == null || context.Session == null) return false;
+    string sessionToken = context.Session[SK_CSRF_TOKEN] as string;
+    if (string.IsNullOrEmpty(sessionToken)) { LogAuthError("ValidateCsrfToken: aucun token en session"); return false; }
+
+    string headerToken = context.Request.Headers[CSRF_HEADER_NAME];
+    if (string.IsNullOrEmpty(headerToken)) headerToken = context.Request.Headers["HTTP_X_CSRF_TOKEN"];
+    if (string.IsNullOrEmpty(headerToken)) { LogAuthError("ValidateCsrfToken: aucun header X-CSRF-Token"); return false; }
+
+    return FixedTimeEquals(sessionToken, headerToken);
+  }
+
+  private static bool FixedTimeEquals(string a, string b)
+  {
+    if (a == null || b == null || a.Length != b.Length) return false;
+    int diff = 0;
+    for (int i = 0; i < a.Length; i++) diff |= a[i] ^ b[i];
+    return diff == 0;
+  }
+
+  public static bool ValidateOrigin(HttpContext context)
+  {
+    if (context == null || context.Request == null) return false;
+    string host = context.Request.Url != null ? context.Request.Url.Host : null;
+    if (string.IsNullOrEmpty(host)) return false;
+
+    string origin = context.Request.Headers["Origin"];
+    if (!string.IsNullOrEmpty(origin))
+    {
+      try { return string.Equals(new Uri(origin).Host, host, StringComparison.OrdinalIgnoreCase); }
+      catch { return false; }
+    }
+
+    string referer = context.Request.Headers["Referer"];
+    if (!string.IsNullOrEmpty(referer))
+    {
+      try { return string.Equals(new Uri(referer).Host, host, StringComparison.OrdinalIgnoreCase); }
+      catch { return false; }
+    }
+
+    LogAuthError("ValidateOrigin: ni Origin ni Referer");
+    return false;
+  }
+
+  public static bool RequireCsrfSafePost(HttpContext context, int minRole = -1)
+  {
+    if (!RequireApiAuth(context, minRole)) return false;
+    if (!ValidateCsrfToken(context)) return false;
+    if (!ValidateOrigin(context)) return false;
+    return true;
+  }
+
+  public static bool RequireCsrfPermission(HttpContext context, string permissionCode)
+  {
+    if (!RequireCsrfSafePost(context, -1)) return false;
+    return HasPermission(permissionCode);
+  }
+
+  public static bool RequireCsrfPermission(HttpContext context, string resource, string action)
+  {
+    if (!RequireCsrfSafePost(context, -1)) return false;
+    if (!string.IsNullOrEmpty(action) && HasPermission(resource + "." + action)) return true;
+    return HasPermission(resource);
+  }
+
+  public static bool RequireApiPermission(HttpContext context, string permissionCode)
+  {
+    if (!RequireApiAuth(context, -1)) return false;
+    return HasPermission(permissionCode);
+  }
+
+  public static string RenderCsrfMetaTag()
   {
     try
     {
-      var html = new StringBuilder();
-      html.Append(@"<div class=""perm-sections"">");
-
-      var bySection = AllMenus
-          .GroupBy(m => m.Section)
-          .OrderBy(g => g.Min(m => m.Order));
-
-      foreach (var grp in bySection)
-      {
-        string sectionKey = grp.Key;
-        string sectionIcon = SectionIcons.ContainsKey(sectionKey)
-            ? SectionIcons[sectionKey]
-            : "fas fa-circle";
-
-        html.AppendFormat(
-            @"<div class=""perm-section"">
-                        <div class=""perm-section-header"">
-                            <i class=""{0}""></i>
-                            <span data-i18n=""{1}"">{2}</span>
-                        </div>
-                        <div class=""perm-section-body"">",
-            sectionIcon,
-            HttpUtility.HtmlAttributeEncode(sectionKey),
-            HttpUtility.HtmlEncode(T(sectionKey)));
-
-        foreach (var menu in grp.OrderBy(m => m.Order))
-        {
-          if (menu.Code == "requetes" && !IsSuperAdmin())
-            continue;
-
-          string checkboxId = GetCheckboxId(menu.Code);
-          string emoji = EmojiByCode.ContainsKey(menu.Code)
-              ? EmojiByCode[menu.Code]
-              : "";
-
-          html.AppendFormat(
-              @"<label class=""perm-item"" for=""{0}"">
-                            <input type=""checkbox"" id=""{0}"" value=""{1}"">
-                            <span class=""perm-emoji"">{2}</span>
-                            <span data-i18n=""{3}"">{4}</span>
-                          </label>",
-              HttpUtility.HtmlAttributeEncode(checkboxId),
-              HttpUtility.HtmlAttributeEncode(menu.Code),
-              emoji,
-              HttpUtility.HtmlAttributeEncode(menu.Text),
-              HttpUtility.HtmlEncode(T(menu.Text)));
-        }
-
-        html.Append(@"</div></div>");
-      }
-
-      html.Append(@"</div>");
-      return html.ToString();
+      string token = GetOrCreateCsrfToken();
+      return "<meta name=\"csrf-token\" content=\"" + HttpUtility.HtmlAttributeEncode(token) + "\">";
     }
-    catch (Exception ex)
-    {
-      return "<div style='color:red;padding:10px;'>Erreur permissions: " +
-             HttpUtility.HtmlEncode(ex.Message) + "</div>";
-    }
+    catch (Exception ex) { LogAuthError("RenderCsrfMetaTag: " + ex.Message); return ""; }
   }
 
   // ============================================================
-  // GESTION DES PERMISSIONS
+  // TRANSFERT D'AUTHENTIFICATION ENTRE SESSIONS
+  // ============================================================
+  private const string AUTH_TRANSFER_CACHE_PREFIX = "AUTH_TRANSFER_";
+
+  public static string StorePendingAuth(Dictionary<string, object> authData)
+  {
+    string token = Guid.NewGuid().ToString("N");
+    HttpRuntime.Cache.Insert(AUTH_TRANSFER_CACHE_PREFIX + token, authData, null,
+        DateTime.Now.AddSeconds(60), System.Web.Caching.Cache.NoSlidingExpiration);
+    return token;
+  }
+
+  public static Dictionary<string, object> RetrievePendingAuth(string token)
+  {
+    if (string.IsNullOrEmpty(token)) return null;
+    string key = AUTH_TRANSFER_CACHE_PREFIX + token;
+    var data = HttpRuntime.Cache[key] as Dictionary<string, object>;
+    if (data != null) HttpRuntime.Cache.Remove(key);
+    return data;
+  }
+
+  // ============================================================
+  // VALIDATION TOKEN DE SESSION
+  // ============================================================
+  private static bool ValidateSessionToken(HttpContext context)
+  {
+    try
+    {
+      int userId = GetUserId(context);
+      string sessionToken = context.Session[SK_SESSION_TOKEN] as string;
+      if (userId <= 0 || string.IsNullOrEmpty(sessionToken)) return false;
+      if (string.IsNullOrEmpty(connStr)) return false;
+
+      using (SqlConnection conn = new SqlConnection(connStr))
+      {
+        conn.Open();
+        string sql = "SELECT COUNT(*) FROM USERS WHERE IDUSER = @userId AND SESSION_TOKEN = @token";
+        using (SqlCommand cmd = new SqlCommand(sql, conn))
+        {
+          cmd.Parameters.AddWithValue("@userId", userId);
+          cmd.Parameters.AddWithValue("@token", sessionToken);
+          return (int)cmd.ExecuteScalar() > 0;
+        }
+      }
+    }
+    catch (Exception ex) { LogAuthError("ValidateSessionToken exception: " + ex.Message); return false; }
+  }
+
+  private static void LogAuthError(string message)
+  {
+    try
+    {
+      string logFile = HttpContext.Current.Server.MapPath("~/App_Data/auth_token.log");
+      File.AppendAllText(logFile, string.Format("[{0}] {1}\n", DateTime.Now, message));
+    }
+    catch { }
+  }
+
+  // ============================================================
+  // PERMISSIONS
   // ============================================================
   public static List<string> GetUserPermissions()
   {
     var session = HttpContext.Current.Session;
-
     if (session != null && session[SK_USER_PERMISSIONS] != null)
-    {
       return session[SK_USER_PERMISSIONS] as List<string>;
-    }
 
     if (IsSuperAdmin())
     {
-      var allPerms = new List<string>();
-      foreach (var menu in AllMenus) allPerms.Add(menu.Code);
-      if (session != null) session[SK_USER_PERMISSIONS] = allPerms;
-      return allPerms;
+      // SuperAdmin : toutes les permissions connues sont dynamiques par module.
+      // On retourne une liste vide par défaut : HasPermission court-circuite.
+      var empty = new List<string>();
+      if (session != null) session[SK_USER_PERMISSIONS] = empty;
+      return empty;
     }
 
     if (IsAdmin())
     {
-      var adminPerms = new List<string>();
-      foreach (var menu in AllMenus)
-      {
-        if (menu.Code != "requetes") adminPerms.Add(menu.Code);
-      }
-      if (session != null) session[SK_USER_PERMISSIONS] = adminPerms;
-      return adminPerms;
+      var empty = new List<string>();
+      if (session != null) session[SK_USER_PERMISSIONS] = empty;
+      return empty;
     }
 
     int? userId = GetCurrentUserId();
@@ -621,30 +306,24 @@ public static class AuthHelper
       if (session != null) session[SK_USER_PERMISSIONS] = permissions;
       return permissions;
     }
-
     return new List<string>();
   }
 
   private static List<string> LoadPermissionsFromDatabase(int userId)
   {
     var permissions = new List<string>();
-
     try
     {
       if (string.IsNullOrEmpty(connStr)) return permissions;
-
       using (SqlConnection conn = new SqlConnection(connStr))
       {
         conn.Open();
-
         string checkColumnQuery = @"
                     SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_NAME = 'USERS' AND COLUMN_NAME = 'MENU_PERMISSIONS'";
-
         using (SqlCommand checkCmd = new SqlCommand(checkColumnQuery, conn))
         {
           int columnExists = (int)checkCmd.ExecuteScalar();
-
           if (columnExists > 0)
           {
             string sql = "SELECT MENU_PERMISSIONS FROM USERS WHERE IDUSER = @id";
@@ -652,14 +331,9 @@ public static class AuthHelper
             {
               cmd.Parameters.AddWithValue("@id", userId);
               object result = cmd.ExecuteScalar();
-
               if (result != null && result != DBNull.Value && !string.IsNullOrEmpty(result.ToString()))
               {
-                try
-                {
-                  var serializer = new JavaScriptSerializer();
-                  permissions = serializer.Deserialize<List<string>>(result.ToString());
-                }
+                try { permissions = new JavaScriptSerializer().Deserialize<List<string>>(result.ToString()); }
                 catch { }
               }
             }
@@ -671,19 +345,13 @@ public static class AuthHelper
             {
               cmd.Parameters.AddWithValue("@id", userId);
               using (SqlDataReader reader = cmd.ExecuteReader())
-              {
-                while (reader.Read())
-                {
-                  permissions.Add(reader["PERMISSION_NAME"].ToString());
-                }
-              }
+                while (reader.Read()) permissions.Add(reader["PERMISSION_NAME"].ToString());
             }
           }
         }
       }
     }
     catch { }
-
     return permissions;
   }
 
@@ -691,21 +359,7 @@ public static class AuthHelper
   {
     if (IsSuperAdmin()) return true;
     if (IsAdmin() && permissionCode != "requetes") return true;
-
-    var permissions = GetUserPermissions();
-    return permissions.Contains(permissionCode);
-  }
-
-  public static List<MenuItem> GetAuthorizedMenus()
-  {
-    var authorizedMenus = new List<MenuItem>();
-
-    foreach (var menu in AllMenus)
-    {
-      if (HasPermission(menu.Code)) authorizedMenus.Add(menu);
-    }
-
-    return authorizedMenus.OrderBy(m => m.Order).ToList();
+    return GetUserPermissions().Contains(permissionCode);
   }
 
   public static bool SaveUserPermissions(int userId, List<string> permissions)
@@ -713,24 +367,18 @@ public static class AuthHelper
     try
     {
       if (string.IsNullOrEmpty(connStr)) return false;
-
       using (SqlConnection conn = new SqlConnection(connStr))
       {
         conn.Open();
-
         string checkColumnQuery = @"
                     SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS
                     WHERE TABLE_NAME = 'USERS' AND COLUMN_NAME = 'MENU_PERMISSIONS'";
-
         using (SqlCommand checkCmd = new SqlCommand(checkColumnQuery, conn))
         {
           int columnExists = (int)checkCmd.ExecuteScalar();
-
           if (columnExists > 0)
           {
-            var serializer = new JavaScriptSerializer();
-            string permissionsJson = serializer.Serialize(permissions);
-
+            string permissionsJson = new JavaScriptSerializer().Serialize(permissions);
             string sql = "UPDATE USERS SET MENU_PERMISSIONS = @permissions WHERE IDUSER = @id";
             using (SqlCommand cmd = new SqlCommand(sql, conn))
             {
@@ -741,17 +389,14 @@ public static class AuthHelper
           }
           else
           {
-            string deleteSql = "DELETE FROM USER_PERMISSIONS WHERE USER_ID = @id";
-            using (SqlCommand deleteCmd = new SqlCommand(deleteSql, conn))
+            using (SqlCommand deleteCmd = new SqlCommand("DELETE FROM USER_PERMISSIONS WHERE USER_ID = @id", conn))
             {
               deleteCmd.Parameters.AddWithValue("@id", userId);
               deleteCmd.ExecuteNonQuery();
             }
-
             foreach (string perm in permissions)
             {
-              string insertSql = "INSERT INTO USER_PERMISSIONS (USER_ID, PERMISSION_NAME) VALUES (@id, @perm)";
-              using (SqlCommand insertCmd = new SqlCommand(insertSql, conn))
+              using (SqlCommand insertCmd = new SqlCommand("INSERT INTO USER_PERMISSIONS (USER_ID, PERMISSION_NAME) VALUES (@id, @perm)", conn))
               {
                 insertCmd.Parameters.AddWithValue("@id", userId);
                 insertCmd.Parameters.AddWithValue("@perm", perm);
@@ -760,20 +405,13 @@ public static class AuthHelper
             }
           }
         }
-
         var session = HttpContext.Current.Session;
         if (session != null && session[SK_IDUSER] != null && Convert.ToInt32(session[SK_IDUSER]) == userId)
-        {
           session[SK_USER_PERMISSIONS] = permissions;
-        }
-
         return true;
       }
     }
-    catch
-    {
-      return false;
-    }
+    catch { return false; }
   }
 
   // ============================================================
@@ -784,7 +422,7 @@ public static class AuthHelper
   public static string RenderLanguageSelector() { return LocalizationHelper.RenderLanguageSelector(); }
 
   // ============================================================
-  // ✅ GÉNÉRATION DU PROFIL UTILISATEUR (HTML) — MODERN
+  // WIDGETS LAYOUT (profil, topbar, control sidebar)
   // ============================================================
   public static string RenderUserProfileHTML()
   {
@@ -792,7 +430,6 @@ public static class AuthHelper
     {
       string userName = GetUserName();
       string roleName = GetRoleName();
-
       if (string.IsNullOrEmpty(userName)) userName = T("User");
 
       var html = new StringBuilder();
@@ -811,7 +448,6 @@ public static class AuthHelper
       html.Append(@"</span>
                 </div>
             </div>");
-
       return html.ToString();
     }
     catch (Exception ex)
@@ -820,145 +456,23 @@ public static class AuthHelper
     }
   }
 
-  // ============================================================
-  // ✅ GÉNÉRATION DU MENU HTML — MODERN
-  // ============================================================
-  public static string RenderMenuHTML()
-  {
-    try
-    {
-      var menus = GetAuthorizedMenus();
-
-      if (menus == null || menus.Count == 0)
-      {
-        return "<div class='nav-section-modern' style='padding:15px;text-align:center;'>" +
-               T("NoData") +
-               "<br><small>" + T("ContactAdmin") + "</small></div>";
-      }
-
-      string currentPage = "";
-      try
-      {
-        if (HttpContext.Current != null && HttpContext.Current.Request != null && HttpContext.Current.Request.Url != null)
-        {
-          currentPage = System.IO.Path.GetFileNameWithoutExtension(
-              HttpContext.Current.Request.Url.AbsolutePath).ToLower();
-        }
-      }
-      catch { }
-
-      var sections = new Dictionary<string, List<MenuItem>>();
-      foreach (var menu in menus)
-      {
-        string sectionKey = menu.Section;
-        if (!sections.ContainsKey(sectionKey))
-          sections[sectionKey] = new List<MenuItem>();
-        sections[sectionKey].Add(menu);
-      }
-
-      var html = new StringBuilder();
-
-      string logoUrl = "";
-      try
-      {
-        logoUrl = VirtualPathUtility.ToAbsolute("~/img/Logo4.png");
-      }
-      catch
-      {
-        logoUrl = "/img/Logo4.png";
-      }
-
-      html.AppendFormat(@"
-                <a href=""#"" class=""brand-link"" onclick=""loadDashboard();return false;"">
-                    <img src=""{0}"" alt=""Logo"" class=""brand-image"">
-                    <span class=""brand-text"">Gestion de Stock</span>
-                </a>", logoUrl);
-
-      html.Append(RenderUserProfileHTML());
-
-      html.Append(@"<div class=""sidebar-nav-modern"">");
-
-      var orderedSections = sections
-          .OrderBy(kv => kv.Value.Min(m => m.Order));
-
-      foreach (var section in orderedSections)
-      {
-        string sectionName = T(section.Key);
-
-        html.AppendFormat(@"
-                <div class=""nav-section-modern"">
-                    <span class=""nav-section-label"">{0}</span>
-                </div>", HttpUtility.HtmlEncode(sectionName));
-
-        html.Append(@"<ul class=""nav-list-modern"">");
-
-        foreach (var menu in section.Value.OrderBy(m => m.Order))
-        {
-          string menuText = T(menu.Text);
-
-          bool isActive = false;
-          if (!string.IsNullOrEmpty(currentPage) && !string.IsNullOrEmpty(menu.Url))
-          {
-            string menuFileName = System.IO.Path.GetFileNameWithoutExtension(menu.Url).ToLower();
-            isActive = currentPage == menuFileName;
-          }
-
-          string activeClass = isActive ? " active" : "";
-
-          html.AppendFormat(@"
-                    <li class=""nav-item-modern"">
-                        <a href=""{0}"" class=""nav-link-modern{1}"" data-menu=""{2}"">
-                            <span class=""nav-icon-wrap"">
-                                <i class=""{3}""></i>
-                            </span>
-                            <span class=""nav-link-text"">{4}</span>",
-              menu.Url, activeClass, menu.Code, menu.Icon, HttpUtility.HtmlEncode(menuText));
-
-          if (menu.Code == "sorties")
-          {
-            html.Append(@" <span id=""sortiePendingCount"" class=""nav-badge-pending"" style=""display:none;"" aria-label=""Bons de sortie non validés""></span>");
-          }
-
-          html.Append(@"</a></li>");
-        }
-
-        html.Append(@"</ul>");
-      }
-
-      html.Append(@"</div>");
-      return html.ToString();
-    }
-    catch (Exception ex)
-    {
-      return "<div style='color:red;padding:10px;'>Erreur menu: " + HttpUtility.HtmlEncode(ex.Message) + "</div>";
-    }
-  }
-
-  // ============================================================
-  // ✅ GÉNÉRATION DE LA TOPBAR HTML — MODERN (badge projet centré)
-  // ============================================================
   public static string RenderTopBarHTML()
   {
     try
     {
       var html = new StringBuilder();
-
       string currentPage = "";
       bool isUsersPage = false;
 
       try
       {
         if (HttpContext.Current != null && HttpContext.Current.Request != null && HttpContext.Current.Request.Url != null)
-        {
           currentPage = HttpContext.Current.Request.Url.AbsolutePath.ToLower();
-        }
       }
       catch { }
 
       if (!string.IsNullOrEmpty(currentPage))
-      {
         isUsersPage = currentPage.Contains("utilisateur.aspx") || currentPage.Contains("users.aspx");
-      }
 
       html.Append(@"
         <nav class=""main-header modern-topbar"">
@@ -991,7 +505,6 @@ public static class AuthHelper
                     <div class=""lang-selector-modern"">
                         <i class=""fas fa-globe lang-selector-icon""></i>
                         <select id=""langSelect"" class=""lang-select-modern"">");
-
       for (int i = 0; i < LocalizationHelper.SupportedCultures.Length; i++)
       {
         string code = LocalizationHelper.SupportedCultures[i];
@@ -999,7 +512,6 @@ public static class AuthHelper
         string selected = (code == currentCulture) ? " selected" : "";
         html.AppendFormat(@"<option value=""{0}""{1}>{2}</option>", code, selected, HttpUtility.HtmlEncode(name));
       }
-
       html.Append(@"</select>
                     </div>
                 </li>");
@@ -1047,7 +559,7 @@ public static class AuthHelper
 
       html.Append(@"
                 <li class=""nav-item"">
-                    <a href=""../../../auth/Logout.aspx"" class=""nav-link topbar-icon-btn topbar-logout"" title=""" + T("Logout") + @""">
+                    <a href=""../../../../auth/Logout.aspx"" class=""nav-link topbar-icon-btn topbar-logout"" title=""" + T("Logout") + @""">
                         <i class=""fas fa-sign-out-alt""></i>
                     </a>
                 </li>");
@@ -1073,7 +585,6 @@ public static class AuthHelper
             </ul>
         </nav>");
 
-      // ✅ Injection du dictionnaire i18n + meta CSRF
       html.Append(LocalizationHelper.RenderDictionaryScript());
       html.Append(RenderCsrfMetaTag());
 
@@ -1085,15 +596,11 @@ public static class AuthHelper
     }
   }
 
-  // ============================================================
-  // ✅ GÉNÉRATION DU CONTROL SIDEBAR HTML — MODERN
-  // ============================================================
   public static string RenderControlSidebarHTML()
   {
     try
     {
       var html = new StringBuilder();
-
       html.Append(@"
             <aside class=""control-sidebar-modern"" id=""controlSidebar"">
                 <div class=""control-sidebar-inner"">
@@ -1145,7 +652,6 @@ public static class AuthHelper
             </aside>
 
             <div id=""sidebarOverlay"" class=""control-sidebar-overlay""></div>");
-
       return html.ToString();
     }
     catch (Exception ex)
@@ -1155,148 +661,106 @@ public static class AuthHelper
   }
 
   // ============================================================
-  // MÉTHODES DE SESSION
+  // SESSION — VerifySession / ForceLogout / Logout
   // ============================================================
-      public static void VerifySession(Page page)
+  public static void VerifySession(Page page)
+  {
+    if (page.Session[SK_AUTHENTICATED] == null || !(bool)page.Session[SK_AUTHENTICATED])
     {
-        if (page.Session[SK_AUTHENTICATED] == null || !(bool)page.Session[SK_AUTHENTICATED])
-        {
-            page.Response.Redirect("~/auth/Login.aspx");
-            return;
-        }
-
-        if (!IsTokenValid())
-        {
-            // ═══════════════════════════════════════════════════════
-            // ✅ ForceLogout détecte automatiquement si une restauration
-            //    est en cours (via Application["RestoreInProgress"])
-            //    et redirige avec ?msg=restore au lieu de ?msg=other_pc
-            // ═══════════════════════════════════════════════════════
-            ForceLogout(page, true);
-            return;
-        }
-
-        if (!page.IsPostBack)
-        {
-            SetUsername(page);
-            SetRolename(page);
-        }
+      page.Response.Redirect("~/auth/Login.aspx");
+      return;
     }
+    if (!IsTokenValid()) { ForceLogout(page, true); return; }
+    if (!page.IsPostBack) { SetUsername(page); SetRolename(page); }
+  }
 
-      private static bool IsTokenValid()
+  private static bool IsTokenValid()
+  {
+    var session = HttpContext.Current.Session;
+    if (session == null || session[SK_IDUSER] == null || session[SK_SESSION_TOKEN] == null) return false;
+
+    try
     {
-        var session = HttpContext.Current.Session;
-        if (session == null || session[SK_IDUSER] == null || session[SK_SESSION_TOKEN] == null)
-            return false;
+      int idUser = (int)session[SK_IDUSER];
+      string tokenSession = session[SK_SESSION_TOKEN].ToString();
+      if (string.IsNullOrEmpty(connStr)) return false;
 
-        try
+      try
+      {
+        var app = HttpContext.Current != null ? HttpContext.Current.Application : null;
+        if (app != null && app["RestoreInProgress"] is bool && (bool)app["RestoreInProgress"]) return true;
+      }
+      catch { }
+
+      using (SqlConnection conn = new SqlConnection(connStr))
+      {
+        using (SqlCommand cmd = new SqlCommand("SELECT SESSION_TOKEN FROM USERS WHERE IDUSER=@id", conn))
         {
-            int idUser = (int)session[SK_IDUSER];
-            string tokenSession = session[SK_SESSION_TOKEN].ToString();
-
-            if (string.IsNullOrEmpty(connStr)) return false;
-
-            // ═══════════════════════════════════════════════════════
-            // ✅ Si une restauration est en cours, on considère le
-            //    token comme valide (sinon l'utilisateur connecté
-            //    serait déconnecté à chaque requête)
-            // ═══════════════════════════════════════════════════════
-            try
-            {
-                var app = HttpContext.Current != null ? HttpContext.Current.Application : null;
-                if (app != null && app["RestoreInProgress"] is bool && (bool)app["RestoreInProgress"])
-                    return true;
-            }
-            catch { }
-
-            using (SqlConnection conn = new SqlConnection(connStr))
-            {
-                using (SqlCommand cmd = new SqlCommand("SELECT SESSION_TOKEN FROM USERS WHERE IDUSER=@id", conn))
-                {
-                    cmd.Parameters.AddWithValue("@id", idUser);
-                    conn.Open();
-                    object tokenDb = cmd.ExecuteScalar();
-                    return tokenDb != null && tokenDb.ToString() == tokenSession;
-                }
-            }
+          cmd.Parameters.AddWithValue("@id", idUser);
+          conn.Open();
+          object tokenDb = cmd.ExecuteScalar();
+          return tokenDb != null && tokenDb.ToString() == tokenSession;
         }
-        catch { return false; }
+      }
     }
+    catch { return false; }
+  }
 
   private static void SetUsername(Page page)
   {
     var session = HttpContext.Current.Session;
     if (session == null || session[SK_USERNAME] == null) return;
-    string username = session[SK_USERNAME].ToString();
     string script = "var el=document.getElementById('navbarUsername'); if(el){el.textContent="
-        + HttpUtility.JavaScriptStringEncode(username, true) + ";}";
+        + HttpUtility.JavaScriptStringEncode(session[SK_USERNAME].ToString(), true) + ";}";
     page.ClientScript.RegisterStartupScript(page.GetType(), "username", script, true);
   }
 
   private static void SetRolename(Page page)
   {
-    string roleName = GetRoleName();
     string script = "var el=document.getElementById('profilUsername'); if(el){el.textContent="
-        + HttpUtility.JavaScriptStringEncode(roleName, true) + ";}";
+        + HttpUtility.JavaScriptStringEncode(GetRoleName(), true) + ";}";
     page.ClientScript.RegisterStartupScript(page.GetType(), "rolename", script, true);
   }
 
-    private static void ForceLogout(Page page, bool otherPc)
+  private static void ForceLogout(Page page, bool otherPc)
+  {
+    bool isRestoreContext = false;
+    try
     {
-        // ═══════════════════════════════════════════════════════════
-        // ✅ Détection du contexte : restauration en cours ?
-        //    Si oui → rediriger avec ?msg=restore au lieu de ?msg=other_pc
-        // ═══════════════════════════════════════════════════════════
-        bool isRestoreContext = false;
-        try
+      var app = HttpContext.Current != null ? HttpContext.Current.Application : null;
+      if (app != null && app["RestoreInProgress"] is bool && (bool)app["RestoreInProgress"])
+      {
+        if (app["RestoreCompletedAt"] is DateTime)
         {
-            var app = HttpContext.Current != null ? HttpContext.Current.Application : null;
-            if (app != null && app["RestoreInProgress"] is bool && (bool)app["RestoreInProgress"])
-            {
-                // Actif depuis moins de 60s ? (sinon on considère comme expiré)
-                if (app["RestoreCompletedAt"] is DateTime)
-                {
-                    DateTime completed = (DateTime)app["RestoreCompletedAt"];
-                    if ((DateTime.Now - completed).TotalSeconds < 60)
-                        isRestoreContext = true;
-                    else
-                    {
-                        // Nettoyage auto : plus de 60s après la fin
-                        app.Lock();
-                        app["RestoreInProgress"] = false;
-                        app.Remove("RestoreStartedAt");
-                        app.Remove("RestoreCompletedAt");
-                        app.UnLock();
-                    }
-                }
-                else if (app["RestoreStartedAt"] is DateTime)
-                {
-                    DateTime started = (DateTime)app["RestoreStartedAt"];
-                    if ((DateTime.Now - started).TotalSeconds < 300) // 5 min max
-                        isRestoreContext = true;
-                }
-            }
+          DateTime completed = (DateTime)app["RestoreCompletedAt"];
+          if ((DateTime.Now - completed).TotalSeconds < 60) isRestoreContext = true;
+          else
+          {
+            app.Lock(); app["RestoreInProgress"] = false;
+            app.Remove("RestoreStartedAt"); app.Remove("RestoreCompletedAt"); app.UnLock();
+          }
         }
-        catch { /* pas critique */ }
-
-        HttpContext.Current.Session.Clear();
-        HttpContext.Current.Session.Abandon();
-
-        string url;
-        if (isRestoreContext)
-            url = "~/auth/Login.aspx?msg=restore";
-        else if (otherPc)
-            url = "~/auth/Login.aspx?msg=other_pc";
-        else
-            url = "~/auth/Login.aspx";
-
-        page.Response.Redirect(url, true);
+        else if (app["RestoreStartedAt"] is DateTime)
+        {
+          DateTime started = (DateTime)app["RestoreStartedAt"];
+          if ((DateTime.Now - started).TotalSeconds < 300) isRestoreContext = true;
+        }
+      }
     }
+    catch { }
+
+    HttpContext.Current.Session.Clear();
+    HttpContext.Current.Session.Abandon();
+
+    string url = isRestoreContext ? "~/auth/Login.aspx?msg=restore"
+               : otherPc           ? "~/auth/Login.aspx?msg=other_pc"
+               :                     "~/auth/Login.aspx";
+    page.Response.Redirect(url, true);
+  }
 
   public static void Logout(HttpContext context)
   {
     if (context == null || context.Session == null) return;
-
     int userId = GetUserId(context);
     if (userId > 0)
     {
@@ -1304,12 +768,10 @@ public static class AuthHelper
       {
         using (SqlConnection conn = new SqlConnection(connStr))
         {
-          string sql = "UPDATE USERS SET SESSION_TOKEN = NULL WHERE IDUSER = @id";
-          using (SqlCommand cmd = new SqlCommand(sql, conn))
+          using (SqlCommand cmd = new SqlCommand("UPDATE USERS SET SESSION_TOKEN = NULL WHERE IDUSER = @id", conn))
           {
             cmd.Parameters.AddWithValue("@id", userId);
-            conn.Open();
-            cmd.ExecuteNonQuery();
+            conn.Open(); cmd.ExecuteNonQuery();
           }
         }
       }
@@ -1321,8 +783,7 @@ public static class AuthHelper
 
     if (context.Request.Cookies["ASP.NET_SessionId"] != null)
     {
-      var cookie = new HttpCookie("ASP.NET_SessionId");
-      cookie.Expires = DateTime.Now.AddDays(-1);
+      var cookie = new HttpCookie("ASP.NET_SessionId") { Expires = DateTime.Now.AddDays(-1) };
       context.Response.Cookies.Add(cookie);
     }
 
@@ -1332,14 +793,13 @@ public static class AuthHelper
       string authCookieName = System.Web.Security.FormsAuthentication.FormsCookieName;
       if (context.Request.Cookies[authCookieName] != null)
       {
-        var authCookie = new HttpCookie(authCookieName);
-        authCookie.Expires = DateTime.Now.AddDays(-1);
+        var authCookie = new HttpCookie(authCookieName) { Expires = DateTime.Now.AddDays(-1) };
         context.Response.Cookies.Add(authCookie);
       }
     }
     catch { }
 
-    context.Response.Cache.SetCacheability(System.Web.HttpCacheability.NoCache);
+    context.Response.Cache.SetCacheability(HttpCacheability.NoCache);
     context.Response.Cache.SetNoStore();
     context.Response.Cache.SetExpires(DateTime.UtcNow.AddYears(-1));
     context.Response.AppendHeader("Pragma", "no-cache");
@@ -1368,28 +828,21 @@ public static class AuthHelper
   {
     int? userId = GetCurrentUserId();
     if (!userId.HasValue || userId.Value <= 0) return "";
-
     try
     {
       if (string.IsNullOrEmpty(connStr)) return "";
-
       using (SqlConnection conn = new SqlConnection(connStr))
       {
         conn.Open();
-        using (SqlCommand cmd = new SqlCommand(
-            "SELECT NOM FROM USERS WHERE IDUSER = @id", conn))
+        using (SqlCommand cmd = new SqlCommand("SELECT NOM FROM USERS WHERE IDUSER = @id", conn))
         {
           cmd.Parameters.AddWithValue("@id", userId.Value);
           object result = cmd.ExecuteScalar();
-          if (result != null && result != DBNull.Value)
-            return result.ToString().Trim();
+          if (result != null && result != DBNull.Value) return result.ToString().Trim();
         }
       }
     }
-    catch (Exception ex)
-    {
-      LogAuthError("GetUserFullName exception: " + ex.Message);
-    }
+    catch (Exception ex) { LogAuthError("GetUserFullName exception: " + ex.Message); }
     return "";
   }
 
@@ -1415,20 +868,18 @@ public static class AuthHelper
   {
     var session = HttpContext.Current.Session;
     if (session == null || session[SK_USERROLE] == null) return null;
-    try { return Convert.ToInt32(session[SK_USERROLE]); }
-    catch { return null; }
+    try { return Convert.ToInt32(session[SK_USERROLE]); } catch { return null; }
   }
 
   private static int? GetCurrentUserId()
   {
     var session = HttpContext.Current.Session;
     if (session == null || session[SK_IDUSER] == null) return null;
-    try { return Convert.ToInt32(session[SK_IDUSER]); }
-    catch { return null; }
+    try { return Convert.ToInt32(session[SK_IDUSER]); } catch { return null; }
   }
 
   // ============================================================
-  // VÉRIFICATIONS DE RÔLES
+  // RÔLES
   // ============================================================
   public static bool IsSuperAdmin() { var r = GetUserRoleId(); return r.HasValue && r.Value == 0; }
   public static bool IsAdmin() { var r = GetUserRoleId(); return r.HasValue && r.Value == 1; }
@@ -1440,7 +891,6 @@ public static class AuthHelper
   {
     var roleId = GetUserRoleId();
     if (!roleId.HasValue) return T("Unknown");
-
     switch (roleId.Value)
     {
       case 0: return T("SuperAdmin");
@@ -1462,7 +912,7 @@ public static class AuthHelper
   }
 
   // ============================================================
-  // GESTION DE LA LICENCE
+  // LICENCE
   // ============================================================
   private enum LicenceStatus { Valide, Manquante, Expiree, Invalide }
 
@@ -1474,46 +924,35 @@ public static class AuthHelper
 
   public static string GetExpirationDateString()
   {
-    DateTime expirationDate; int maxUsers;
-    LicenceStatus status = CheckLicence(out expirationDate, out maxUsers);
-
-    if (status == LicenceStatus.Valide || status == LicenceStatus.Expiree)
-      return expirationDate.ToString("dd/MM/yyyy");
-    else if (status == LicenceStatus.Manquante)
-      return T("LicenceMissing");
-    else
-      return T("LicenceInvalid");
+    DateTime exp; int max;
+    var status = CheckLicence(out exp, out max);
+    if (status == LicenceStatus.Valide || status == LicenceStatus.Expiree) return exp.ToString("dd/MM/yyyy");
+    if (status == LicenceStatus.Manquante) return T("LicenceMissing");
+    return T("LicenceInvalid");
   }
 
   public static string GetMaxUsersString()
   {
-    DateTime expirationDate; int maxUsers;
-    LicenceStatus status = CheckLicence(out expirationDate, out maxUsers);
-
-    if (status == LicenceStatus.Valide || status == LicenceStatus.Expiree)
-      return maxUsers.ToString();
-    else
-      return "0";
+    DateTime exp; int max;
+    var status = CheckLicence(out exp, out max);
+    if (status == LicenceStatus.Valide || status == LicenceStatus.Expiree) return max.ToString();
+    return "0";
   }
 
   public static bool IsMaxUsersReached()
   {
-    DateTime expirationDate; int maxUsers;
-    LicenceStatus status = CheckLicence(out expirationDate, out maxUsers);
-
+    DateTime exp; int max;
+    var status = CheckLicence(out exp, out max);
     if (status != LicenceStatus.Valide) return true;
-
     try
     {
       if (string.IsNullOrEmpty(connStr)) return true;
-
       using (SqlConnection conn = new SqlConnection(connStr))
       {
         using (SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM USERS WHERE SESSION_TOKEN IS NOT NULL", conn))
         {
           conn.Open();
-          int activeUsers = (int)cmd.ExecuteScalar();
-          return activeUsers >= maxUsers;
+          return (int)cmd.ExecuteScalar() >= max;
         }
       }
     }
@@ -1522,38 +961,24 @@ public static class AuthHelper
 
   public static bool IsLicenceValid()
   {
-    DateTime expirationDate; int maxUsers;
-    LicenceStatus status = CheckLicence(out expirationDate, out maxUsers);
-    return status == LicenceStatus.Valide;
+    DateTime exp; int max;
+    return CheckLicence(out exp, out max) == LicenceStatus.Valide;
   }
 
   public static SidebarInfo GetSidebarInfo()
   {
-    DateTime expirationDate; int maxUsers;
-    LicenceStatus status = CheckLicence(out expirationDate, out maxUsers);
-
-    string expirationText; string maxUsersText;
-
+    DateTime exp; int max;
+    var status = CheckLicence(out exp, out max);
+    string expText, maxText;
     if (status == LicenceStatus.Valide || status == LicenceStatus.Expiree)
-    {
-      expirationText = expirationDate.ToString("dd/MM/yyyy");
-      maxUsersText = maxUsers.ToString();
-    }
-    else if (status == LicenceStatus.Manquante)
-    {
-      expirationText = T("LicenceMissing");
-      maxUsersText = "0";
-    }
-    else
-    {
-      expirationText = T("LicenceInvalid");
-      maxUsersText = "0";
-    }
+    { expText = exp.ToString("dd/MM/yyyy"); maxText = max.ToString(); }
+    else if (status == LicenceStatus.Manquante) { expText = T("LicenceMissing"); maxText = "0"; }
+    else { expText = T("LicenceInvalid"); maxText = "0"; }
 
     return new SidebarInfo
     {
-      ExpirationDate = expirationText,
-      MaxUsers = maxUsersText,
+      ExpirationDate = expText,
+      MaxUsers = maxText,
       IsValid = (status == LicenceStatus.Valide),
       IsExpired = (status == LicenceStatus.Expiree)
     };
@@ -1570,35 +995,24 @@ public static class AuthHelper
       {
         expirationDate = _cachedExpirationDate;
         maxUsers = _cachedMaxUsers;
-
-        if (_cachedExpirationDate == DateTime.MinValue)
-          return LicenceStatus.Invalide;
-
-        if (DateTime.Now.Date > _cachedExpirationDate.Date)
-          return LicenceStatus.Expiree;
-
+        if (_cachedExpirationDate == DateTime.MinValue) return LicenceStatus.Invalide;
+        if (DateTime.Now.Date > _cachedExpirationDate.Date) return LicenceStatus.Expiree;
         return LicenceStatus.Valide;
       }
     }
 
-    if (HttpContext.Current == null)
-      return LicenceStatus.Invalide;
-
+    if (HttpContext.Current == null) return LicenceStatus.Invalide;
     string path = HttpContext.Current.Server.MapPath("~/bin/licence.key");
-    if (!File.Exists(path))
-      return LicenceStatus.Manquante;
+    if (!File.Exists(path)) return LicenceStatus.Manquante;
 
     string secret = ConfigurationManager.AppSettings["LicenceSecret"];
-    if (string.IsNullOrEmpty(secret))
-      return LicenceStatus.Invalide;
+    if (string.IsNullOrEmpty(secret)) return LicenceStatus.Invalide;
 
     try
     {
       string[] lines = File.ReadAllLines(path);
-
       string expClear = GetValueFromLines(lines, "EXPIRATIONS", false);
       string maxClear = GetValueFromLines(lines, "MAX_USERSS", false);
-
       string expHash = GetValueFromLines(lines, "EXPIRATION", true);
       string maxHash = GetValueFromLines(lines, "MAX_USERS", true);
       string sigHash = GetValueFromLines(lines, "SIGNATURE", true);
@@ -1607,9 +1021,7 @@ public static class AuthHelper
           System.Globalization.CultureInfo.InvariantCulture,
           System.Globalization.DateTimeStyles.None, out expirationDate))
         return LicenceStatus.Invalide;
-
-      if (!int.TryParse(maxClear, out maxUsers) || maxUsers <= 0)
-        return LicenceStatus.Invalide;
+      if (!int.TryParse(maxClear, out maxUsers) || maxUsers <= 0) return LicenceStatus.Invalide;
 
       string expCalc = ComputeHmacSha256(expClear, secret);
       string maxCalc = ComputeHmacSha256(maxUsers.ToString(), secret);
@@ -1624,27 +1036,15 @@ public static class AuthHelper
         _cachedMaxUsers = maxUsers;
         _cacheTime = DateTime.Now;
       }
-
-      if (DateTime.Now.Date > expirationDate.Date)
-        return LicenceStatus.Expiree;
-
-      return LicenceStatus.Valide;
+      return DateTime.Now.Date > expirationDate.Date ? LicenceStatus.Expiree : LicenceStatus.Valide;
     }
-    catch
-    {
-      return LicenceStatus.Invalide;
-    }
+    catch { return LicenceStatus.Invalide; }
   }
 
   private static string GetValueFromLines(string[] lines, string key, bool first)
   {
     var values = new List<string>();
-    foreach (var line in lines)
-    {
-      if (line.StartsWith(key + "="))
-        values.Add(line.Substring(key.Length + 1).Trim());
-    }
-
+    foreach (var line in lines) if (line.StartsWith(key + "=")) values.Add(line.Substring(key.Length + 1).Trim());
     if (values.Count == 0) return null;
     return first ? values[0] : values[values.Count - 1];
   }
@@ -1658,9 +1058,6 @@ public static class AuthHelper
     }
   }
 
-  // ============================================================
-  // INFORMATIONS DE LICENCE
-  // ============================================================
   public class LicenceInfo
   {
     public DateTime ExpirationDate { get; set; }

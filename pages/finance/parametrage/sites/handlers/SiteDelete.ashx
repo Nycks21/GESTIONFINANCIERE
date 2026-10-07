@@ -1,0 +1,133 @@
+<%@ WebHandler Language="C#" Class="SiteDelete" %>
+using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
+using System.Web;
+using System.Web.Script.Serialization;
+using System.Web.SessionState;
+
+public class SiteDelete : IHttpHandler, IRequiresSessionState
+{
+    public void ProcessRequest(HttpContext ctx)
+    {
+        ctx.Response.ContentType = "application/json";
+        ctx.Response.Charset = "utf-8";
+        ctx.Response.Cache.SetNoStore();
+
+        // ✅ Sécurité renforcée : Session + Token CSRF + Origin/Referer
+        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        {
+            ctx.Response.StatusCode = 403;
+            ctx.Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");
+            return;
+        }
+        if (!AuthHelper.HasPermission("sites"))
+        {
+            ctx.Response.StatusCode = 403;
+            ctx.Response.Write("{\"success\":false,\"message\":\"Permission refusée\"}");
+            return;
+        }
+
+        try
+        {
+            string json = new System.IO.StreamReader(ctx.Request.InputStream).ReadToEnd();
+            var serializer = new JavaScriptSerializer();
+            var data = serializer.Deserialize<Dictionary<string, object>>(json);
+
+            if (data == null)
+            {
+                ctx.Response.Write("{\"success\":false,\"message\":\"Corps de requête invalide.\"}");
+                return;
+            }
+
+            string id = GetString(data, "id");
+            if (string.IsNullOrEmpty(id))
+            {
+                ctx.Response.Write("{\"success\":false,\"message\":\"ID manquant.\"}");
+                return;
+            }
+
+            int userId = AuthHelper.GetUserId(ctx);
+            string connStr = AuthHelper.ConnectionString;
+
+            using (var conn = new SqlConnection(connStr))
+            {
+                conn.Open();
+
+                // Vérification : le site est-il référencé par un journal ?
+                string referenceSql = @"
+                    SELECT COUNT(*)
+                    FROM FJOURNAL
+                    WHERE SITE_ID = @id AND DELETION_AT IS NULL";
+                using (var referenceCmd = new SqlCommand(referenceSql, conn))
+                {
+                    referenceCmd.Parameters.AddWithValue("@id", id);
+                    if (Convert.ToInt32(referenceCmd.ExecuteScalar()) > 0)
+                    {
+                        ctx.Response.Write(serializer.Serialize(new
+                        {
+                            success = false,
+                            message = "Impossible de supprimer : ce site est utilisé par un ou plusieurs journaux."
+                        }));
+                        return;
+                    }
+                }
+
+                // Soft delete + nettoyage de EN_COURS
+                string sql = @"
+                    UPDATE FSITE
+                    SET DELETION_AT = GETDATE(),
+                        DELETION_BY = @userId,
+                        EN_COURS    = 0
+                    WHERE ID = @id AND DELETION_AT IS NULL";
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@id", id);
+                    cmd.Parameters.AddWithValue("@userId", userId);
+                    int rows = cmd.ExecuteNonQuery();
+                    if (rows == 0)
+                    {
+                        ctx.Response.Write("{\"success\":false,\"message\":\"Site introuvable ou déjà supprimé.\"}");
+                        return;
+                    }
+                }
+            }
+
+            ctx.Response.Write(serializer.Serialize(new { success = true, message = "Site supprimé." }));
+        }
+        catch (SqlException ex)
+        {
+            if (ex.Number == 547)
+            {
+                ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+                {
+                    success = false,
+                    message = "Impossible de supprimer : ce site est référencé ailleurs."
+                }));
+                return;
+            }
+            ctx.Response.StatusCode = 500;
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+            {
+                success = false,
+                message = ex.Message.Replace("\"", "\\\"")
+            }));
+        }
+        catch (Exception ex)
+        {
+            ctx.Response.StatusCode = 500;
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+            {
+                success = false,
+                message = ex.Message.Replace("\"", "\\\"")
+            }));
+        }
+    }
+
+    private string GetString(Dictionary<string, object> data, string key)
+    {
+        return data.ContainsKey(key) && data[key] != null ? data[key].ToString() : null;
+    }
+
+    public bool IsReusable { get { return false; } }
+}

@@ -5,8 +5,8 @@
 <head>
     <meta charset="UTF-8" />
     <title>Erreur Serveur</title>
-    <link rel="stylesheet" href="../../dist/css/adminlte.min.css" />
-    <link rel="stylesheet" href="../../plugins/fontawesome-free/css/all.min.css" />
+    <link rel="stylesheet" href="../_assets/css/adminlte.min.css" />
+    <link rel="stylesheet" href="../_assets/css/fontawesome.min.css" />
 </head>
 <body class="hold-transition layout-top-nav">
     <div class="wrapper">
@@ -19,13 +19,12 @@
 
             <!-- Formulaire pour les boutons -->
             <form id="form1" runat="server" class="text-center mt-4">
-                <asp:Button ID="btnBackup" runat="server" Text="Télécharger la sauvegarde" CssClass="btn btn-danger mr-2" OnClick="btnBackup_Click" />
-                <asp:Button ID="btnRetourLogin" runat="server" Text="Retour Login" CssClass="btn btn-primary" OnClick="btnRetourLogin_Click" />
+                <asp:Button ID="btnRetourLogin" runat="server" Text="Retour à l'accueil" CssClass="btn btn-primary" OnClick="btnRetourLogin_Click" />
             </form>
         </div>
     </div>
 
-    <script src="../../plugins/jquery/jquery.min.js"></script>
-    <script src="../../plugins/bootstrap/js/bootstrap.bundle.min.js"></script>
+    <script src="../_assets/js/jquery.min.js"></script>
+    <script src="../_assets/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

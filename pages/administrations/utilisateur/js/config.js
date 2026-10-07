@@ -11,7 +11,7 @@ var API_USERS = {
     delete: 'api/DeleteUser.aspx',
     checkLicence: 'api/CheckLicence.aspx',
     backup: 'api/BackupDatabase.aspx',
-    downloadBackup:  'api/DownloadBackup.aspx', 
+    downloadBackup:  'api/DownloadBackup.aspx',
     restore: 'api/RestoreDatabase.aspx',
     restoreUpload: 'api/RestoreDatabaseForm.aspx',
     checkFile: 'api/CheckFile.aspx',
@@ -24,7 +24,7 @@ var API_USERS = {
 // Liste des permissions (doit être strictement identique aux clés de CHECKBOX_ID_MAP
 // et aux codes définis dans AuthHelper.AllMenus côté serveur).
 var PERMISSIONS_LIST = [
-    'accueil', 'unites', 'emplacements', 'articles', 'categories', 'fournisseurs',
+    'accueil', 'accueils', 'accueilc', 'unites', 'sites', 'emplacements', 'articles', 'categories', 'fournisseurs',
     'entrees', 'sorties', 'stock', 'saisies', 'accuses', 'inventaire',
     'exploitation','resetpwd', 'utilisateurs', 'requetes'
 ];
@@ -32,7 +32,10 @@ var PERMISSIONS_LIST = [
 // Mapping permission → ID de la checkbox HTML
 var CHECKBOX_ID_MAP = {
     'accueil': 'permDashboard',
+    'accueils': 'permDashboards',
+    'accueilc': 'permDashboardc',
     'unites': 'permUnites',
+    'sites': 'permSites',
     'emplacements': 'permEmplacements',
     'articles': 'permArticles',
     'categories': 'permCategories',
@@ -55,7 +58,7 @@ var DEFAULT_ROLE_PERMISSIONS = {
     1: ['accueil', 'unites', 'emplacements', 'articles', 'categories', 'fournisseurs', 'entrees', 'sorties', 'stock', 'saisies', 'accuses', 'inventaire', 'exploitation', 'resetpwd', 'utilisateurs'],          // Admin
     2: ['accueil','saisies', 'accuses', 'resetpwd'],                                                                                                                                                                       // User
     3: ['accueil','unites', 'emplacements', 'articles', 'categories', 'fournisseurs', 'entrees', 'sorties', 'stock', 'inventaire', 'exploitation', 'resetpwd'],                                                           // Logisticien
-    4: ['accueil', 'stock', 'saisies', 'accuses', 'inventaire', 'exploitation', 'resetpwd']                                                                                                          // Comptable
+    4: ['accueil', 'stock', 'saisies', 'sites', 'accuses', 'inventaire', 'exploitation', 'resetpwd']                                                                                                          // Comptable
 };
 
 var CURRENT_VERSION = document.querySelector('[data-version]')?.getAttribute('data-version') || '2.1.17';

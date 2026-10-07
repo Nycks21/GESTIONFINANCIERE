@@ -23,7 +23,7 @@
 
           <aside class="main-sidebar" id="sidebar">
             <div class="sidebar">
-              <%= AuthHelper.RenderMenuHTML() %>
+              <%= AuthHelperDashboard.RenderMenuHTML() %>
             </div>
           </aside>
 
@@ -203,7 +203,9 @@
                     <span data-i18n="label.permissions">Permissions et accès au menu :</span>
                   </label>
 
-                  <%= AuthHelper.RenderPermissionsUI() %>
+                  <%= AuthHelperDashboard.RenderPermissionsUI() %>
+                    <%= AuthHelperStock.RenderPermissionsUI() %>
+                      <%= AuthHelperFinance.RenderPermissionsUI() %>
                 </div>
               </div>
             </div>

@@ -175,7 +175,7 @@
 
                 <div class="login-subtitle">
                     <span class="login-subtitle__line"></span>
-                    <span class="login-subtitle__text">Gestion de Stock</span>
+                    <span class="login-subtitle__text">Gestion financière</span>
                     <span class="login-subtitle__line"></span>
                 </div>
             </div>
@@ -237,7 +237,9 @@
 
             <div class="login-card__footer">
                 <i class="fas fa-shield-alt"></i>
-                <span>Connexion sécurisée · MOZH &copy; <%= DateTime.Now.Year %></span>
+                <marquee behavior="scroll" direction="left">
+                    <span>Connexion sécurisée · MOZH &copy; <%= DateTime.Now.Year %></span>
+                </marquee>
             </div>
         </div>
     </div>

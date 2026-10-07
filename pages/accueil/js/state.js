@@ -1,16 +1,9 @@
 'use strict';
 
-window.DashboardState = {
+window.DASHBOARD_STATE = {
     kpi: null,
-    alerts: [],
-    movements: null,
-    categories: null,
-    recentMovements: [],
-    recentDocuments: [],
-    topArticles: [],
-    charts: {
-        movements: null,
-        categories: null
-    },
-    lastRefresh: null
+    evolution: null,
+    repartition: null,
+    activites: [],
+    lastUpdate: null
 };

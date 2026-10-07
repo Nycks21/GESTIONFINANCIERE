@@ -25,7 +25,7 @@
           <!-- ═══ SIDEBAR ═══ -->
           <aside class="main-sidebar" id="sidebar">
             <div class="sidebar">
-              <%= AuthHelper.RenderMenuHTML() %>
+              <%= AuthHelperDashboard.RenderMenuHTML() %>
             </div>
           </aside>
 

@@ -20,7 +20,7 @@
     <%= AuthHelper.RenderTopBarHTML() %>
 
     <aside class="main-sidebar" id="sidebar">
-      <div class="sidebar"><%= AuthHelper.RenderMenuHTML() %></div>
+      <div class="sidebar"><%= AuthHelperDashboard.RenderMenuHTML() %></div>
     </aside>
 
     <%= AuthHelper.RenderControlSidebarHTML() %>

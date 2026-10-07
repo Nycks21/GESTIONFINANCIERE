@@ -1,0 +1,183 @@
+/* ============================================================================
+   Module SITES (Finance) — Styles spécifiques
+   Tous les composants communs sont dans ../../../../_assets/css/global.css
+   ============================================================================ */
+
+/* ═══════════════════════════════════════════════════════════════
+   1. TOASTS
+   ═══════════════════════════════════════════════════════════════ */
+#toastContainer {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.toast-item {
+    min-width: 250px;
+    max-width: 350px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    animation: toast-in 0.2s ease;
+}
+
+.toast-item.success { background: linear-gradient(135deg, #22C55E, #16A34A); }
+.toast-item.error   { background: linear-gradient(135deg, #EF4444, #DC2626); }
+.toast-item.info    { background: linear-gradient(135deg, #06B6D4, #0891B2); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}
+
+body.dark-mode .toast-item.success { background: #16A34A; }
+body.dark-mode .toast-item.error   { background: #DC2626; }
+body.dark-mode .toast-item.info    { background: #0891B2; }
+
+/* ═══════════════════════════════════════════════════════════════
+   2. FORMULAIRE — MODAL
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Le champ DESCRIPTION accepte les retours à la ligne */
+#siteDescription {
+    resize: vertical;
+    min-height: 70px;
+    font-family: inherit;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   3. TABLE SITES — Pleine largeur + scroll horizontal si nécessaire
+   ═══════════════════════════════════════════════════════════════ */
+
+/* Wrapper : scroll horizontal quand la table dépasse */
+.sites-table-wrap {
+    position: relative;
+    width: 100%;
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background: #fff;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: thin;
+    scrollbar-color: #cbd5e1 #f1f5f9;
+}
+
+/* Scrollbar personnalisée (WebKit) */
+.sites-table-wrap::-webkit-scrollbar {
+    height: 8px;
+}
+.sites-table-wrap::-webkit-scrollbar-track {
+    background: #f1f5f9;
+    border-radius: 4px;
+}
+.sites-table-wrap::-webkit-scrollbar-thumb {
+    background: #cbd5e1;
+    border-radius: 4px;
+}
+.sites-table-wrap::-webkit-scrollbar-thumb:hover {
+    background: #94a3b8;
+}
+
+/* Table : largeur fixe des colonnes via <th style="width:..."> dans le HTML.
+   min-width: 100% → s'étire en plein écran si l'espace le permet. */
+.sites-table {
+    width: 1020px;
+    min-width: 100%;
+    border-collapse: collapse;
+    table-layout: fixed;
+}
+
+/* Cellules : padding homogène + troncature propre */
+.sites-table th,
+.sites-table td {
+    padding: 12px 14px;
+    vertical-align: middle;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.sites-table thead th {
+    background-color: #f8f9fa;
+    font-weight: 700;
+}
+
+/* Description (3e colonne) : tronquée proprement */
+.sites-table td:nth-child(3) {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+/* État (4e colonne) : centré */
+.sites-table td:nth-child(4),
+.sites-table th:nth-child(4) {
+    text-align: center;
+}
+
+/* Actions (dernière colonne) : aligné à droite */
+.sites-table td:last-child,
+.sites-table th:last-child {
+    text-align: right;
+}
+
+/* État de chargement */
+.sites-table td.table-loading {
+    text-align: center;
+    padding: 40px;
+    color: #ccc;
+    font-size: 24px;
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   4. INDICE VISUEL — Dégradé à droite quand ça déborde
+   ═══════════════════════════════════════════════════════════════ */
+@media (max-width: 1080px) {
+    .sites-table-wrap::after {
+        content: '';
+        position: sticky;
+        right: 0;
+        top: 0;
+        float: right;
+        width: 40px;
+        height: 100%;
+        min-height: 200px;
+        background: linear-gradient(to right,
+                    rgba(255,255,255,0) 0%,
+                    rgba(255,255,255,0.9) 100%);
+        pointer-events: none;
+        z-index: 1;
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   5. MODE SOMBRE
+   ═══════════════════════════════════════════════════════════════ */
+body.dark-mode .sites-table-wrap {
+    background: #1e293b;
+    border-color: #334155;
+}
+
+body.dark-mode .sites-table-wrap::-webkit-scrollbar-track {
+    background: #0f172a;
+}
+
+body.dark-mode .sites-table-wrap::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+body.dark-mode .sites-table-wrap::-webkit-scrollbar-thumb:hover {
+    background: #64748b;
+}
+
+body.dark-mode .sites-table thead th {
+    background-color: #172033;
+}

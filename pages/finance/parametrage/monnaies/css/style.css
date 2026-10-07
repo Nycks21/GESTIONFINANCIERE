@@ -1,0 +1,67 @@
+/* ============================================================================
+   Module MONNAIES — styles spécifiques
+   ============================================================================ */
+
+.stat-card-info {
+    background: linear-gradient(135deg, #f39c12 0%, #e67e22 100%);
+}
+.stat-card-info .stat-icon,
+.stat-card-info .stat-value,
+.stat-card-info .stat-label {
+    color: #fff;
+}
+
+.form-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+}
+.form-row .form-group {
+    flex: 1;
+    min-width: 140px;
+}
+
+.field-hint {
+    display: block;
+    font-size: 11.5px;
+    color: #6c757d;
+    margin-top: 3px;
+    font-style: italic;
+}
+
+.field-error {
+    display: none;
+    color: #dc3545;
+    font-size: 12px;
+    margin-top: 3px;
+}
+
+#toastContainer {
+    position: fixed;
+    top: 14px;
+    right: 14px;
+    z-index: 9999;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.toast-item {
+    min-width: 250px;
+    max-width: 350px;
+    padding: 11px 16px;
+    border-radius: 10px;
+    color: #fff;
+    font-size: 13.5px;
+    font-weight: 500;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+    animation: toast-in 0.2s ease;
+}
+.toast-item.success { background: linear-gradient(135deg, #22C55E, #16A34A); }
+.toast-item.error   { background: linear-gradient(135deg, #EF4444, #DC2626); }
+.toast-item.info    { background: linear-gradient(135deg, #06B6D4, #0891B2); }
+
+@keyframes toast-in {
+    from { opacity: 0; transform: translateX(20px); }
+    to   { opacity: 1; transform: translateX(0); }
+}

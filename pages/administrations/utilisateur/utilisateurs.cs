@@ -19,6 +19,12 @@ public partial class utilisateurs : System.Web.UI.Page
             ClientScript.RegisterStartupScript(this.GetType(), "superadmin", script, true);
         }
 
+        if (!AuthHelper.HasPermission("sites"))
+        {
+            Response.Redirect("~/pages/error/Error500.aspx", false);
+            Context.ApplicationInstance.CompleteRequest();
+        }
+
         // ✅ Maintenant HttpContext est reconnu
         hfUserRole.Value = AuthHelper.GetUserRole(HttpContext.Current).ToString();
     }
