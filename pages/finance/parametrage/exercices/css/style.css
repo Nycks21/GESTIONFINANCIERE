@@ -1,0 +1,39 @@
+/* Module EXERCICES — Styles spécifiques */
+
+#toastContainer { position:fixed; top:14px; right:14px; z-index:9999; display:flex; flex-direction:column; gap:6px; }
+.toast-item { min-width:250px; max-width:350px; padding:11px 16px; border-radius:10px; color:#fff; font-size:13.5px; font-weight:500;
+              box-shadow:0 8px 24px rgba(0,0,0,.15); animation:toast-in .2s ease; }
+.toast-item.success { background:linear-gradient(135deg,#22C55E,#16A34A); }
+.toast-item.error   { background:linear-gradient(135deg,#EF4444,#DC2626); }
+.toast-item.info    { background:linear-gradient(135deg,#06B6D4,#0891B2); }
+@keyframes toast-in { from{opacity:0;transform:translateX(20px);} to{opacity:1;transform:translateX(0);} }
+
+.badge-code {
+    display:inline-block; background:linear-gradient(135deg,#007bff,#0056b3);
+    color:#fff !important; font-weight:700; font-size:12px; letter-spacing:.5px;
+    padding:5px 12px; border-radius:6px; font-family:'Courier New',monospace;
+}
+
+.badge-statut {
+    display:inline-flex; align-items:center; gap:6px;
+    font-size:11.5px; font-weight:700; padding:5px 12px; border-radius:20px;
+}
+.badge-ouvert  { background:#d1fae5; color:#047857; }
+.badge-cloture { background:#fee2e2; color:#b91c1c; }
+.badge-archive { background:#e5e7eb; color:#374151; }
+
+.badge-duree {
+    display:inline-block; background:#f3f4f6; color:#4b5563;
+    font-size:11.5px; padding:4px 10px; border-radius:6px;
+}
+
+/* Bouton CLÔTURER (jaune) */
+.btn-warning { background:#ffc107; border-color:#ffc107; color:#212529; }
+.btn-warning:hover { background:#e0a800; border-color:#d39e00; color:#fff; }
+
+/* Mode sombre */
+body.dark-mode .badge-ouvert  { background:#064e3b; color:#6ee7b7; }
+body.dark-mode .badge-cloture { background:#7f1d1d; color:#fecaca; }
+body.dark-mode .badge-archive { background:#374151; color:#d1d5db; }
+body.dark-mode .badge-duree   { background:#1e293b; color:#94a3b8; }
+body.dark-mode .badge-code    { background:linear-gradient(135deg,#1e40af,#1e3a8a); }

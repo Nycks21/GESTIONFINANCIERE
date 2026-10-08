@@ -1,4 +1,4 @@
-﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -22,6 +22,9 @@ public static class AuthHelperFinance
     new AuthHelper.MenuItem { Code = "accueilc",  Text = "menu.accueilc",  Url = "/pages/finance/accueil/index.aspx",                 Icon = "fas fa-save",       Section = "section.applications", Order = 2  },
     new AuthHelper.MenuItem { Code = "sites",     Text = "menu.sites",     Url = "/pages/finance/parametrage/sites/sites.aspx",       Icon = "fas fa-map-marker-alt",   Section = "section.parametres",   Order = 3  },
     new AuthHelper.MenuItem { Code = "monnaies",  Text = "menu.monnaies",  Url = "/pages/finance/parametrage/monnaies/monnaies.aspx", Icon = "fas fa-money-bill-wave",  Section = "section.parametres",   Order = 4  },
+    new AuthHelper.MenuItem { Code = "taux",      Text = "menu.taux",      Url = "/pages/finance/parametrage/taux/taux.aspx",         Icon = "fas fa-exchange-alt",   Section = "section.parametres",   Order = 5  },
+    new AuthHelper.MenuItem { Code = "exercices",      Text = "menu.exercices",      Url = "/pages/finance/parametrage/exercices/exercices.aspx",         Icon = "fas fa-calendar-alt",   Section = "section.parametres",   Order = 6  },
+
   };
 
   public static readonly Dictionary<string, string> CheckboxIdByCode = new Dictionary<string, string>
@@ -30,6 +33,7 @@ public static class AuthHelperFinance
     { "accueilc", "permDashboardc" },
     { "sites",    "permSites"      },
     { "monnaies", "permMonnaies"   },
+    { "taux",     "permTaux"       },
   };
 
   private static readonly Dictionary<string, string> SectionIcons = new Dictionary<string, string>
@@ -45,6 +49,7 @@ public static class AuthHelperFinance
     { "accueilc", "📊" },
     { "sites",    "🚩" },
     { "monnaies", "💰" },
+    { "taux",     "💱" },
   };
 
   public static string GetCheckboxId(string menuCode)

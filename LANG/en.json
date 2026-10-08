@@ -1536,5 +1536,170 @@
 
   "monnaies.confirm.delete_title": "Confirm deletion",
   "monnaies.confirm.delete_text": "This action cannot be undone. Delete this currency?",
-  "monnaies.confirm.delete_yes": "Yes, delete"
+  "monnaies.confirm.delete_yes": "Yes, delete",
+
+  "menu.taux": "Exchange Rates",
+  "taux.title": "Exchange Rates",
+  "taux.list_title": "Exchange Rate List",
+  "taux.table.source": "Source Currency",
+  "taux.table.cible": "Target Currency",
+  "taux.table.taux": "Rate",
+  "taux.table.date_effet": "Effective Date",
+  "taux.table.source_info": "Source Information",
+  "taux.table.statut": "Status",
+  "taux.table.actions": "Actions",
+
+  "taux.stat.total": "Total",
+  "taux.stat.active": "Active",
+  "taux.stat.inactive": "Inactive",
+
+  "taux.btn.add": "New Exchange Rate",
+  "taux.btn.pdf": "PDF",
+  "taux.btn.excel": "Excel",
+
+  "taux.filter.all_source": "All Source Currencies",
+  "taux.filter.all_target": "All Target Currencies",
+  "taux.filter.all_status": "All Statuses",
+  "taux.filter.active": "Active",
+  "taux.filter.inactive": "Inactive",
+
+  "taux.search_placeholder": "Search by currency, rate or date…",
+  "taux.reset_filters": "Reset Filters",
+
+  "taux.rows_per_page.10": "10 / page",
+  "taux.rows_per_page.25": "25 / page",
+  "taux.rows_per_page.50": "50 / page",
+  "taux.rows_per_page.100": "100 / page",
+  "taux.rows_per_page.all": "All",
+
+  "taux.counter": "{n} rate(s) displayed",
+  "taux.counter.zero": "0 rates",
+
+  "taux.msg.no_data": "No exchange rate found.",
+  "taux.msg.load_error": "Error loading exchange rates.",
+  "taux.msg.stats_error": "Error loading statistics.",
+  "taux.msg.added": "Exchange rate added successfully.",
+  "taux.msg.updated": "Exchange rate updated successfully.",
+  "taux.msg.deleted": "Exchange rate deleted successfully.",
+  "taux.msg.delete_failed": "Failed to delete.",
+
+  "taux.msg.source_required": "Source currency is required.",
+  "taux.msg.cible_required": "Target currency is required.",
+  "taux.msg.taux_required": "Rate is required.",
+  "taux.msg.date_required": "Effective date is required.",
+  "taux.msg.currencies_different": "Source and target currencies must be different.",
+
+  "taux.modal.add_title": "New Exchange Rate",
+  "taux.modal.edit_title": "Edit Exchange Rate",
+  "taux.modal.view_title": "Exchange Rate Details",
+
+  "taux.modal.source_label": "Source Currency",
+  "taux.modal.cible_label": "Target Currency",
+  "taux.modal.taux_label": "Exchange Rate",
+  "taux.modal.date_label": "Effective Date",
+  "taux.modal.source_info_label": "Source Information",
+  "taux.modal.actif_label": "Active",
+
+  "taux.modal.taux_placeholder": "Ex.: 1.00",
+  "taux.modal.source_info_placeholder": "Additional information about the source…",
+
+  "taux.confirm.delete_title": "Confirm Deletion",
+  "taux.confirm.delete_text": "This action cannot be undone. Do you really want to delete this exchange rate?",
+  "taux.confirm.delete_yes": "Yes, Delete",
+
+  "taux.status.active": "Active",
+  "taux.status.inactive": "Inactive",
+
+  "exercices.title": "Accounting Periods",
+  "exercices.list_title": "Accounting Period List",
+
+  "exercices.stat.total": "Total",
+  "exercices.stat.ouverts": "Open",
+  "exercices.stat.clotures": "Closed",
+  "exercices.stat.archives": "Archived",
+
+  "exercices.btn.add": "New Accounting Period",
+  "exercices.btn.pdf": "PDF",
+  "exercices.btn.excel": "Excel",
+
+  "exercices.filter.all_status": "All Statuses",
+  "exercices.filter.all_active": "All States",
+  "exercices.filter.active": "Active",
+  "exercices.filter.inactive": "Inactive",
+
+  "exercices.search_placeholder": "Search by code or label…",
+  "exercices.reset_filters": "Reset Filters",
+
+  "exercices.rows_per_page.10": "10 / page",
+  "exercices.rows_per_page.25": "25 / page",
+  "exercices.rows_per_page.50": "50 / page",
+  "exercices.rows_per_page.100": "100 / page",
+  "exercices.rows_per_page.all": "All",
+
+  "exercices.counter": "{n} period(s) displayed",
+  "exercices.counter.zero": "0 periods",
+
+  "exercices.table.code": "Code",
+  "exercices.table.libelle": "Label",
+  "exercices.table.date_debut": "Start Date",
+  "exercices.table.date_fin": "End Date",
+  "exercices.table.duree": "Duration",
+  "exercices.table.statut": "Status",
+  "exercices.table.active": "Active",
+  "exercices.table.actions": "Actions",
+
+  "exercices.status.ouvert": "Open",
+  "exercices.status.cloture": "Closed",
+  "exercices.status.archive": "Archived",
+  "exercices.status.actif": "Active",
+  "exercices.status.inactif": "Inactive",
+
+  "exercices.action.view": "View Details",
+  "exercices.action.cloturer": "Close",
+  "exercices.action.reouvrir": "Reopen",
+
+  "exercices.modal.add_title": "New Accounting Period",
+  "exercices.modal.edit_title": "Edit Accounting Period",
+  "exercices.modal.view_title": "Accounting Period Details",
+
+  "exercices.modal.code_label": "Code",
+  "exercices.modal.code_hint": "Unique accounting period code",
+  "exercices.modal.code_placeholder": "Ex.: 2026",
+  "exercices.modal.libelle_label": "Label",
+  "exercices.modal.libelle_placeholder": "Ex.: Accounting Period 2026",
+  "exercices.modal.date_debut_label": "Start Date",
+  "exercices.modal.date_fin_label": "End Date",
+  "exercices.modal.statut_label": "Status",
+  "exercices.modal.statut_hint": "A closed accounting period cannot be modified",
+  "exercices.modal.active_label": "Active",
+
+  "exercices.msg.added": "Accounting period added successfully.",
+  "exercices.msg.updated": "Accounting period updated successfully.",
+  "exercices.msg.deleted": "Accounting period deleted successfully.",
+  "exercices.msg.load_error": "Error loading accounting periods.",
+  "exercices.msg.no_data": "No accounting period found.",
+  "exercices.msg.delete_failed": "Failed to delete.",
+  "exercices.msg.clotured": "Accounting period closed successfully.",
+  "exercices.msg.reouvert": "Accounting period reopened successfully.",
+
+  "exercices.msg.code_required": "Code is required.",
+  "exercices.msg.code_too_long": "Code is too long.",
+  "exercices.msg.libelle_required": "Label is required.",
+  "exercices.msg.date_debut_required": "Start date is required.",
+  "exercices.msg.date_fin_required": "End date is required.",
+  "exercices.msg.date_fin_after_debut": "End date must be after the start date.",
+
+  "exercices.confirm.delete_title": "Confirm Deletion",
+  "exercices.confirm.delete_text": "This action cannot be undone. Do you really want to delete this accounting period?",
+  "exercices.confirm.delete_yes": "Yes, Delete",
+
+  "exercices.confirm.cloturer_title": "Confirm Closing",
+  "exercices.confirm.cloturer_html": "Do you really want to close this accounting period?<br><strong>This operation cannot be undone.</strong>",
+  "exercices.confirm.cloturer_yes": "Yes, Close",
+
+  "exercices.confirm.reouvrir_title": "Confirm Reopening",
+  "exercices.confirm.reouvrir_html": "Do you really want to reopen this accounting period?",
+  "exercices.confirm.reouvrir_yes": "Yes, Reopen",
+
+  "menu.exercices": "Accounting Periods"
 }

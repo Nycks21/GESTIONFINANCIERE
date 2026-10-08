@@ -3,18 +3,16 @@ using System.Web.UI;
 
 public partial class Error500 : Page
 {
-    // Bouton Retour Login
+    /// <summary>Bouton « Retour à l'accueil ».</summary>
     protected void btnRetourLogin_Click(object sender, EventArgs e)
     {
         Response.Redirect("~/auth/Login.aspx");
     }
 
-    // Bouton Télécharger la sauvegarde
+    /// <summary>Bouton « Télécharger la sauvegarde » (conservé tel quel).</summary>
     protected void btnBackup_Click(object sender, EventArgs e)
     {
-        // Ici tu peux mettre ton code pour générer le backup
-        // Pour l'instant, on fait juste une redirection vers la page principale
-        // Remplace cette ligne par ton code de backup si besoin
+        // Code de génération du backup à insérer ici si nécessaire.
         Response.Redirect("~/auth/Login.aspx");
     }
 }

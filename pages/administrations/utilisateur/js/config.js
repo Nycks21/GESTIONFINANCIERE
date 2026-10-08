@@ -1,71 +1,70 @@
 'use strict';
 
-// ─────────────────────────────────────────────────────────────────────────────
-// CONFIGURATION — Module Utilisateurs
-// ─────────────────────────────────────────────────────────────────────────────
+// ============================================================
+// CONFIG — Déclaration API + signal de disponibilité
+// ============================================================
+(function () {
 
-var API_USERS = {
-    list: 'api/ListUser.aspx',
-    create: 'api/users.aspx',
-    update: 'api/updateUser.aspx',
-    delete: 'api/DeleteUser.aspx',
-    checkLicence: 'api/CheckLicence.aspx',
-    backup: 'api/BackupDatabase.aspx',
-    downloadBackup:  'api/DownloadBackup.aspx',
-    restore: 'api/RestoreDatabase.aspx',
-    restoreUpload: 'api/RestoreDatabaseForm.aspx',
-    checkFile: 'api/CheckFile.aspx',
-    deleteFile: 'api/DeleteFile.aspx',
-    getBackupList: 'api/GetBackupList.aspx',
-    notifyMaintenance: 'api/NotifyMaintenance.aspx',
-    checkUpdates: 'api/CheckUpdates.aspx'
-};
+    // Base de tous les endpoints API (relative au dossier de la page)
+    var API_BASE = 'api/';
 
-// Liste des permissions (doit être strictement identique aux clés de CHECKBOX_ID_MAP
-// et aux codes définis dans AuthHelper.AllMenus côté serveur).
-var PERMISSIONS_LIST = [
-    'accueil', 'accueils', 'accueilc', 'unites', 'sites', 'emplacements', 'articles', 'categories', 'fournisseurs',
-    'entrees', 'sorties', 'stock', 'saisies', 'accuses', 'inventaire',
-    'exploitation','resetpwd', 'utilisateurs', 'requetes'
-];
+    // Endpoints métier
+    var API_USERS = {
+        list:         'ListUser.aspx',
+        create:       'users.aspx',
+        update:       'updateUser.aspx',
+        delete:       'DeleteUser.aspx',
+        checkLicence: 'CheckLicence.aspx',
+        backupDatabase:  'BackupDatabase.aspx'
+    };
 
-// Mapping permission → ID de la checkbox HTML
-var CHECKBOX_ID_MAP = {
-    'accueil': 'permDashboard',
-    'accueils': 'permDashboards',
-    'accueilc': 'permDashboardc',
-    'unites': 'permUnites',
-    'sites': 'permSites',
-    'emplacements': 'permEmplacements',
-    'articles': 'permArticles',
-    'categories': 'permCategories',
-    'fournisseurs': 'permFournisseurs',
-    'entrees': 'permEntrees',
-    'sorties': 'permSorties',
-    'stock': 'permStock',
-    'saisies': 'permSaisies',
-    'accuses': 'permAccuses',
-    'inventaire': 'permInventaire',
-    'exploitation': 'permExploitation',
-    'resetpwd': 'permResetpwd',
-    'utilisateurs': 'permUser',
-    'requetes': 'permRequetes'
-};
+    // ─── Construction d'URL robuste ───
+    function buildApiUrl(endpoint) {
+        if (!endpoint || typeof endpoint !== 'string' || endpoint.trim() === '') {
+            throw new Error('[config] buildApiUrl: endpoint vide ou invalide → ' + endpoint);
+        }
 
-// ✅ Permissions par défaut par ROLEID (0 = SuperAdmin, 1 = Admin, 2 = User, 3 = Logisticien, 4 = Comptable)
-var DEFAULT_ROLE_PERMISSIONS = {
-    0: ['accueil', 'unites', 'emplacements', 'articles', 'categories', 'fournisseurs', 'entrees', 'sorties', 'stock', 'saisies', 'accuses', 'inventaire', 'exploitation', 'resetpwd', 'utilisateurs', 'requetes'], // SuperAdmin
-    1: ['accueil', 'unites', 'emplacements', 'articles', 'categories', 'fournisseurs', 'entrees', 'sorties', 'stock', 'saisies', 'accuses', 'inventaire', 'exploitation', 'resetpwd', 'utilisateurs'],          // Admin
-    2: ['accueil','saisies', 'accuses', 'resetpwd'],                                                                                                                                                                       // User
-    3: ['accueil','unites', 'emplacements', 'articles', 'categories', 'fournisseurs', 'entrees', 'sorties', 'stock', 'inventaire', 'exploitation', 'resetpwd'],                                                           // Logisticien
-    4: ['accueil', 'stock', 'saisies', 'sites', 'accuses', 'inventaire', 'exploitation', 'resetpwd']                                                                                                          // Comptable
-};
+        // Base = dossier de la page courante (sans le nom de fichier)
+        var base = window.location.href
+            .replace(/[?#].*$/, '')      // enlève query + hash
+            .replace(/[^/]*$/, '');      // enlève le fichier
 
-var CURRENT_VERSION = document.querySelector('[data-version]')?.getAttribute('data-version') || '2.1.17';
+        // On normalise pour éviter les doubles slashs
+        var full = base + API_BASE + endpoint.replace(/^\/+/, '');
 
-// Exposer globalement
-window.API_USERS = API_USERS;
-window.PERMISSIONS_LIST = PERMISSIONS_LIST;
-window.CHECKBOX_ID_MAP = CHECKBOX_ID_MAP;
-window.DEFAULT_ROLE_PERMISSIONS = DEFAULT_ROLE_PERMISSIONS;
-window.CURRENT_VERSION = CURRENT_VERSION;
+        // Sécurité finale : ne JAMAIS retourner l'URL de la page elle-même
+        var pageUrl = window.location.href.split('?')[0].split('#')[0];
+        if (full === pageUrl) {
+            throw new Error('[config] URL API identique à la page : ' + full);
+        }
+
+        return full;
+    }
+
+    // ─── Exposition globale ───
+    window.APP_CONFIG = {
+        API_BASE:     API_BASE,
+        API_USERS:    API_USERS,
+        buildApiUrl:  buildApiUrl,
+        ready:        false
+    };
+
+    // Compatibilité avec le code existant (le temps de migrer)
+    window.API_USERS = API_USERS;
+    window.apiUrl    = function (endpoint) { return buildApiUrl(endpoint); };
+
+    // ─── Signal de disponibilité ───
+    window.APP_CONFIG.ready = true;
+
+    // Événement pour les consommateurs qui attendent
+    try {
+        document.dispatchEvent(new CustomEvent('config:ready', {
+            detail: { API_USERS: API_USERS, buildApiUrl: buildApiUrl }
+        }));
+    } catch (e) {
+        console.warn('[config] CustomEvent non supporté', e);
+    }
+
+    console.log('✅ [config] Prêt — base API =', API_BASE);
+    console.log('✅ [config] Exemple :', buildApiUrl(API_USERS.list));
+})();

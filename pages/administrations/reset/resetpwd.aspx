@@ -4,6 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="../../_assets/js/theme-init.js?v=<%=AuthHelper.Version %>"></script>
   <title data-i18n="resetpwd.pageTitle">Changer mot de passe — Gestion Stock</title>
 
   <link rel="stylesheet" href="../../_assets/css/all.min.css?v=<%=AuthHelper.Version %>">
@@ -13,6 +14,7 @@
 </head>
 
 <body class="hold-transition" data-version="<%=AuthHelper.Version %>">
+<script>document.body.classList.toggle("dark-mode", document.documentElement.classList.contains("dark-mode"));</script>
 <form id="form1" runat="server">
   <asp:HiddenField ID="hfUserRole" runat="server" />
   <div class="wrapper">

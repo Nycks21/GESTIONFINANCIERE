@@ -85,6 +85,16 @@ html {
   height: 100%;
   width: 100%;
   overflow-x: hidden;
+  /* ✅ Anti-flash : fond opaque + scheme clair par défaut */
+  background: #F5F7FA;
+  color-scheme: light;
+}
+
+/* ✅ Règle dark de la racine : évite le flash blanc pendant le repaint
+   et synchronise la scrollbar + contrôles natifs */
+html.dark-mode {
+  background: #0F172A;
+  color-scheme: dark;
 }
 
 body {
@@ -3809,7 +3819,6 @@ body.dark-mode #lignesBody select.ligne-article:disabled {
 body.dark-mode {
   background-color: #0F172A;
   color: #F8FAFC;
-  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 body.dark-mode a {
@@ -4855,4 +4864,17 @@ body.dark-mode .pwd-strength-bar {
     width: 100%;
     justify-content: center;
   }
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   NO-TRANSITION — Désactive toute animation pendant le switch
+   de thème pour éviter le fade in/out
+   ═══════════════════════════════════════════════════════════════ */
+.theme-switching,
+.theme-switching *,
+.theme-switching *::before,
+.theme-switching *::after {
+  transition: none !important;
+  animation-duration: 0.001ms !important;
+  animation-delay: 0ms !important;
 }

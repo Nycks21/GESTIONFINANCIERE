@@ -7,36 +7,73 @@
 <script runat="server">
 protected void Page_Load(object sender, EventArgs e)
 {
-    Response.ContentType = "application/json";
-    Response.ContentEncoding = System.Text.Encoding.UTF8;
+    // ────────────────────────────────────────────────────────────
+    // Préparation de la réponse JSON
+    // ────────────────────────────────────────────────────────────
+    // IMPORTANT : TrySkipIisCustomErrors = true empêche IIS de
+    // remplacer nos réponses JSON d'erreur par sa propre page HTML
+    // (ce qui était une cause probable du "<!DOCTYPE" reçu côté client).
+    // ────────────────────────────────────────────────────────────
     Response.Clear();
-    Response.AddHeader("Cache-Control", "no-cache, no-store");
+    Response.ContentType   = "application/json";
+    Response.ContentEncoding = System.Text.Encoding.UTF8;
+    Response.TrySkipIisCustomErrors = true;
+
+    Response.AddHeader("Cache-Control", "no-cache, no-store, must-revalidate");
+    Response.AddHeader("Pragma", "no-cache");
+    Response.AddHeader("Expires", "0");
     Response.Cache.SetNoStore();
 
     try
     {
-        // ✅ Vérification d'authentification : Admin ou SuperAdmin
+        // ────────────────────────────────────────────────────────
+        // Auth : Admin (1) ou SuperAdmin (0)
+        // ────────────────────────────────────────────────────────
+        // ⚠️ À VÉRIFIER : si AuthHelper.RequireApiAuth fait un
+        //    Response.Redirect(...) en interne, il faut le modifier
+        //    pour qu'il écrive du JSON + StatusCode, et retourne false.
+        //    Sinon le client recevra du HTML de Login.aspx.
+        // ────────────────────────────────────────────────────────
         if (!AuthHelper.RequireApiAuth(Context, 1))
         {
+            Response.StatusCode = 401;
             Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");
             return;
         }
 
-        string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+        // ────────────────────────────────────────────────────────
+        // Chaîne de connexion
+        // ────────────────────────────────────────────────────────
+        string connStr = ConfigurationManager
+            .ConnectionStrings["MaConnexion"]
+            .ConnectionString;
+
+        if (string.IsNullOrEmpty(connStr))
+        {
+            Response.StatusCode = 500;
+            Response.Write("{\"success\":false,\"message\":\"Erreur de configuration\"}");
+            return;
+        }
+
+        // ────────────────────────────────────────────────────────
+        // Récupération des utilisateurs
+        // ────────────────────────────────────────────────────────
+        var users      = new List<Dictionary<string, object>>();
+        var serializer = new JavaScriptSerializer();
 
         using (SqlConnection conn = new SqlConnection(connStr))
         {
             conn.Open();
 
-            // ✅ Filtres stricts :
-            //    - DELETION_AT IS NULL  → jamais supprimé logiquement
-            //    - DELETION_BY IS NULL  → aucune trace de suppression
-            //    - ROLEID != 99         → exclure les comptes techniques/masqués
-            // ✅ Ne pas exposer les mots de passe
+            // Filtres stricts :
+            //   - DELETION_AT IS NULL  → jamais supprimé logiquement
+            //   - DELETION_BY IS NULL  → aucune trace de suppression
+            //   - ROLEID != 99         → exclure les comptes techniques
+            // Ne pas exposer les mots de passe.
             string query = @"
                 SELECT IDUSER, USERNAME, NOM,
-                       ISNULL(EMAIL, '') AS EMAIL,
-                       ISNULL(TELEPHONE, '') AS TELEPHONE,
+                       ISNULL(EMAIL, '')      AS EMAIL,
+                       ISNULL(TELEPHONE, '')  AS TELEPHONE,
                        ROLEID, CREATED_AT,
                        CAST(ISNULL(ACTIVE, 0) AS BIT) AS ACTIVE
                 FROM USERS
@@ -48,9 +85,6 @@ protected void Page_Load(object sender, EventArgs e)
             using (SqlCommand cmd = new SqlCommand(query, conn))
             using (SqlDataReader reader = cmd.ExecuteReader())
             {
-                var users = new List<Dictionary<string, object>>();
-                var serializer = new JavaScriptSerializer();
-
                 while (reader.Read())
                 {
                     var user = new Dictionary<string, object>();
@@ -62,22 +96,35 @@ protected void Page_Load(object sender, EventArgs e)
                     user["ROLEID"]     = reader["ROLEID"];
                     user["CREATED_AT"] = Convert.ToDateTime(reader["CREATED_AT"]);
                     user["ACTIVE"]     = reader["ACTIVE"];
-
                     users.Add(user);
                 }
-
-                Response.Write(serializer.Serialize(users));
             }
         }
+
+        Response.StatusCode = 200;
+        Response.Write(serializer.Serialize(users));
+    }
+    catch (SqlException sqlEx)
+    {
+        // Log serveur (visible dans les traces, pas dans la réponse HTTP)
+        System.Diagnostics.Trace.TraceError(
+            "ListUser.SqlException: " + sqlEx.Message + Environment.NewLine + sqlEx.StackTrace);
+
+        Response.StatusCode = 500;
+        Response.Write("{\"success\":false,\"message\":\"Erreur base de données\"}");
     }
     catch (Exception ex)
     {
-        // ✅ Log sans exposer les détails
-        Response.Write("{\"success\":false,\"error\":\"Erreur lors de la récupération des utilisateurs\"}");
+        System.Diagnostics.Trace.TraceError(
+            "ListUser.Exception: " + ex.ToString());
+
+        Response.StatusCode = 500;
+        Response.Write("{\"success\":false,\"message\":\"Erreur serveur\"}");
     }
-    finally
-    {
-        Response.End();
-    }
+
+    // ❌ NE PAS appeler Response.End() ici :
+    //    - inutile (la page se termine naturellement)
+    //    - provoque ThreadAbortException, considérée comme mauvaise pratique
+    //    - peut casser le pipeline IIS si un module écoute EndRequest
 }
 </script>

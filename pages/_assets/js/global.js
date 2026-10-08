@@ -1,17 +1,11 @@
 /* ═══════════════════════════════════════════════════════════════
    global.js — Gestion Stock
-   Version unifiée — conflits résolus, logiques préservées
+   Version corrigée — bug apiUrl (hoisting) résolu
    ═══════════════════════════════════════════════════════════════
 */
 
 // ============================================================================
 // 🔒 ACTIVATION DE LA PROTECTION CSRF
-// ----------------------------------------------------------------------------
-// Doit être exécuté EN PREMIER, avant toute fonction qui utilise fetch().
-// Le patch est idempotent (window.__csrfPatched) : appeler plusieurs fois
-// patchGlobalFetch() est sans effet secondaire.
-//
-// ⚠️ Requiert que /_assets/js/csrf.js soit chargé AVANT global.js.
 // ============================================================================
 (function activateCsrfProtection() {
   if (typeof window.patchGlobalFetch === "function") {
@@ -22,8 +16,7 @@
   } else {
     if (window.console && console.warn) {
       console.warn(
-        "⚠️ csrf.js non chargé : protection CSRF inactive. " +
-          "Vérifiez que <script src=\".../js/csrf.js\"> est bien présent AVANT global.js.",
+        "⚠️ csrf.js non chargé : protection CSRF inactive.",
       );
     }
   }
@@ -33,28 +26,22 @@ function formatNumber(value, decimals) {
   decimals = decimals || 2;
   var num = parseFloat(value);
   if (isNaN(num)) return "0,00";
-
   var fixed = num.toFixed(decimals);
   var parts = fixed.split(".");
   var integerPart = parts[0];
   var decimalPart = parts[1] || "";
   var integerWithSpaces = integerPart.replace(/\B(?=(\d{3})+(?!\d))/g, " ");
-
   return integerWithSpaces + "," + decimalPart;
 }
 
 // ============================================================================
 // INITIALISATION - ATTENDRE QUE jQuery SOIT CHARGÉ
 // ============================================================================
-
-// ✅ Attendre que le DOM soit prêt AVANT d'utiliser jQuery
 document.addEventListener("DOMContentLoaded", function () {
-  // Vérifier que jQuery est bien chargé
   if (typeof $ !== "undefined") {
     console.log("🔵 Page chargée - Initialisation GlobalJS");
     initDarkMode();
   } else {
-    // Fallback : réessayer après un délai
     setTimeout(function () {
       if (typeof $ !== "undefined") {
         console.log("🔵 Page chargée (retard) - Initialisation GlobalJS");
@@ -67,19 +54,12 @@ document.addEventListener("DOMContentLoaded", function () {
 (function () {
   "use strict";
 
-  /* ─── Constantes ─────────────────────────────────────────────────── */
   var MOBILE_BP = 768;
   var STORAGE_KEY = "sidebarCollapsed";
-
-  /* ─── Références DOM ─────────────────────────────────────────────── */
   var sidebar, contentWrapper, mainHeader, overlay;
 
-  /* ─── Utilitaires ────────────────────────────────────────────────── */
-  function isMobile() {
-    return window.innerWidth <= MOBILE_BP;
-  }
+  function isMobile() { return window.innerWidth <= MOBILE_BP; }
 
-  /* ─── Création unique de l'overlay ──────────────────────────────── */
   function createOverlay() {
     overlay = document.getElementById("sidebarOverlay");
     if (!overlay) {
@@ -90,16 +70,12 @@ document.addEventListener("DOMContentLoaded", function () {
     overlay.addEventListener("click", closeSidebarMobile);
   }
 
-  /* ─── Résolution des références DOM ──────────────────────────────── */
   function resolveDOM() {
     sidebar = document.getElementById("sidebar");
     contentWrapper = document.getElementById("contentWrapper");
     mainHeader = document.querySelector(".main-header");
   }
 
-  /* ══════════════════════════════════════════════════
-     MOBILE : slide-in / slide-out
-  ══════════════════════════════════════════════════ */
   function openSidebarMobile() {
     if (!sidebar) return;
     sidebar.classList.add("sidebar-open");
@@ -115,25 +91,12 @@ document.addEventListener("DOMContentLoaded", function () {
     document.body.style.overflow = "";
   }
 
-  /* ══════════════════════════════════════════════════
-     DESKTOP : collapse 250px ↔ 60px
-  ══════════════════════════════════════════════════ */
   function toggleDesktop() {
     if (!sidebar) return;
-
     var isCollapsed = sidebar.classList.toggle("sidebar-collapsed");
-
-    if (contentWrapper) {
-      contentWrapper.classList.toggle("sidebar-collapsed", isCollapsed);
-    }
-
-    if (mainHeader) {
-      mainHeader.style.left = isCollapsed ? "60px" : "250px";
-    }
-
-    try {
-      localStorage.setItem(STORAGE_KEY, isCollapsed ? "1" : "0");
-    } catch (e) {}
+    if (contentWrapper) contentWrapper.classList.toggle("sidebar-collapsed", isCollapsed);
+    if (mainHeader) mainHeader.style.left = isCollapsed ? "60px" : "250px";
+    try { localStorage.setItem(STORAGE_KEY, isCollapsed ? "1" : "0"); } catch (e) {}
   }
 
   function restoreDesktopState() {
@@ -147,32 +110,23 @@ document.addEventListener("DOMContentLoaded", function () {
     } catch (e) {}
   }
 
-  /* ══════════════════════════════════════════════════
-     GESTIONNAIRE BURGER
-  ══════════════════════════════════════════════════ */
   function onMenuToggleClick(e) {
     e.preventDefault();
     e.stopPropagation();
-
     if (!sidebar) resolveDOM();
     if (!sidebar) return;
-
     if (isMobile()) {
-      sidebar.classList.contains("sidebar-open")
-        ? closeSidebarMobile()
-        : openSidebarMobile();
+      sidebar.classList.contains("sidebar-open") ? closeSidebarMobile() : openSidebarMobile();
     } else {
       toggleDesktop();
     }
   }
 
-  // ✅ Attendre que le DOM soit chargé pour ajouter les écouteurs
   document.addEventListener("DOMContentLoaded", function () {
     document.addEventListener("click", function (e) {
       var target = e.target;
       if (!target) return;
-      var isToggle =
-        target.id === "menuToggle" || !!target.closest("#menuToggle");
+      var isToggle = target.id === "menuToggle" || !!target.closest("#menuToggle");
       if (isToggle) onMenuToggleClick(e);
     });
   });
@@ -180,61 +134,38 @@ document.addEventListener("DOMContentLoaded", function () {
   function bindNavLinks() {
     if (!sidebar) return;
     sidebar.querySelectorAll(".nav-link").forEach(function (link) {
-      link.addEventListener("click", function () {
-        if (isMobile()) closeSidebarMobile();
-      });
+      link.addEventListener("click", function () { if (isMobile()) closeSidebarMobile(); });
     });
   }
 
-  /* ─── Swipe mobile ──────────────────────────────────────────────── */
-  var touchStartX = 0;
-  var touchStartY = 0;
+  var touchStartX = 0, touchStartY = 0;
+  document.addEventListener("touchstart", function (e) {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+  }, { passive: true });
 
-  document.addEventListener(
-    "touchstart",
-    function (e) {
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
-    },
-    { passive: true },
-  );
+  document.addEventListener("touchend", function (e) {
+    if (!isMobile()) return;
+    var dx = e.changedTouches[0].clientX - touchStartX;
+    var dy = e.changedTouches[0].clientY - touchStartY;
+    if (Math.abs(dy) > Math.abs(dx)) return;
+    if (dx < -60) closeSidebarMobile();
+    if (dx > 60 && touchStartX < 40) openSidebarMobile();
+  }, { passive: true });
 
-  document.addEventListener(
-    "touchend",
-    function (e) {
-      if (!isMobile()) return;
-      var dx = e.changedTouches[0].clientX - touchStartX;
-      var dy = e.changedTouches[0].clientY - touchStartY;
-
-      if (Math.abs(dy) > Math.abs(dx)) return;
-
-      if (dx < -60) closeSidebarMobile();
-      if (dx > 60 && touchStartX < 40) openSidebarMobile();
-    },
-    { passive: true },
-  );
-
-  /* ─── Resize ────────────────────────────────────────────────────── */
   var resizeTimer;
   window.addEventListener("resize", function () {
     clearTimeout(resizeTimer);
     resizeTimer = setTimeout(function () {
-      if (!isMobile()) {
-        closeSidebarMobile();
-        restoreDesktopState();
-      }
+      if (!isMobile()) { closeSidebarMobile(); restoreDesktopState(); }
       setTimeout(setActiveMenu, 50);
     }, 100);
   });
 
-  /* ══════════════════════════════════════════════════
-     NOTIFICATIONS DROPDOWN
-  ══════════════════════════════════════════════════ */
   document.addEventListener("click", function (e) {
     var notifToggle = document.getElementById("notifToggle");
     var notifDropdown = document.getElementById("notifDropdown");
     if (!notifToggle || !notifDropdown) return;
-
     if (notifToggle.contains(e.target)) {
       e.stopPropagation();
       var isOpen = notifDropdown.classList.toggle("show");
@@ -245,121 +176,59 @@ document.addEventListener("DOMContentLoaded", function () {
     }
   });
 
-  /* ══════════════════════════════════════════════════
-     PLEIN ÉCRAN
-  ══════════════════════════════════════════════════ */
   document.addEventListener("click", function (e) {
     if (!e.target) return;
-    var fsToggle =
-      e.target.id === "fullscreenToggle"
-        ? e.target
-        : e.target.closest("#fullscreenToggle");
+    var fsToggle = e.target.id === "fullscreenToggle" ? e.target : e.target.closest("#fullscreenToggle");
     if (!fsToggle) return;
-
     if (!document.fullscreenElement) {
-      document.documentElement.requestFullscreen &&
-        document.documentElement.requestFullscreen().catch(function () {});
+      document.documentElement.requestFullscreen && document.documentElement.requestFullscreen().catch(function () {});
     } else {
-      document.exitFullscreen &&
-        document.exitFullscreen().catch(function () {});
+      document.exitFullscreen && document.exitFullscreen().catch(function () {});
     }
   });
-
-  /* ══════════════════════════════════════════════════
-     GESTION DU MENU ACTIF
-  ══════════════════════════════════════════════════ */
 
   function normalizeMenuPath(value) {
     if (!value) return "";
     try {
       var clean = value.split("?")[0].split("#")[0].replace(/\\/g, "/");
-      if (clean.indexOf("://") !== -1) {
-        return new URL(clean).pathname.replace(/\/+$/, "").toLowerCase();
-      }
-      return new URL(clean, window.location.href).pathname
-        .replace(/\/+$/, "")
-        .toLowerCase();
+      if (clean.indexOf("://") !== -1) return new URL(clean).pathname.replace(/\/+$/, "").toLowerCase();
+      return new URL(clean, window.location.href).pathname.replace(/\/+$/, "").toLowerCase();
     } catch (err) {
-      return (value || "")
-        .split("?")[0]
-        .split("#")[0]
-        .replace(/\\/g, "/")
-        .replace(/\/+$/, "")
-        .toLowerCase();
+      return (value || "").split("?")[0].split("#")[0].replace(/\\/g, "/").replace(/\/+$/, "").toLowerCase();
     }
   }
 
   function setActiveMenu() {
     var currentPath = normalizeMenuPath(window.location.pathname);
     var currentFile = currentPath.split("/").pop() || "";
-    var menuLinks = document.querySelectorAll(
-      ".sidebar .nav-link, .nav-pills .nav-link",
-    );
-
+    var menuLinks = document.querySelectorAll(".sidebar .nav-link, .nav-pills .nav-link");
     menuLinks.forEach(function (link) {
       var href = link.getAttribute("href") || "";
       var hrefPath = normalizeMenuPath(href);
       var hrefFile = hrefPath ? hrefPath.split("/").pop() : "";
       var menuCode = (link.getAttribute("data-menu") || "").toLowerCase();
-      var pageCode = currentFile
-        .replace(/\.aspx$/i, "")
-        .replace(/\.html$/i, "");
-
+      var pageCode = currentFile.replace(/\.aspx$/i, "").replace(/\.html$/i, "");
       var isCurrent = false;
-
-      if (
-        hrefPath &&
-        (currentPath === hrefPath ||
-          currentPath.endsWith(hrefPath) ||
-          hrefPath.endsWith(currentPath))
-      ) {
-        isCurrent = true;
-      }
-
-      if (!isCurrent && hrefFile && hrefFile === currentFile) {
-        isCurrent = true;
-      }
-
+      if (hrefPath && (currentPath === hrefPath || currentPath.endsWith(hrefPath) || hrefPath.endsWith(currentPath))) isCurrent = true;
+      if (!isCurrent && hrefFile && hrefFile === currentFile) isCurrent = true;
       if (!isCurrent && menuCode) {
-        if (
-          menuCode === pageCode ||
-          currentPath.indexOf("/" + menuCode + "/") !== -1 ||
-          currentPath.indexOf(menuCode) !== -1
-        ) {
-          isCurrent = true;
-        }
+        if (menuCode === pageCode || currentPath.indexOf("/" + menuCode + "/") !== -1 || currentPath.indexOf(menuCode) !== -1) isCurrent = true;
       }
-
       link.classList.toggle("active", isCurrent);
-      if (isCurrent) {
-        link.setAttribute("aria-current", "page");
-      } else {
-        link.removeAttribute("aria-current");
-      }
+      if (isCurrent) link.setAttribute("aria-current", "page");
+      else link.removeAttribute("aria-current");
     });
-
-    var activeLink = document.querySelector(
-      ".sidebar .nav-link.active, .nav-pills .nav-link.active",
-    );
-    if (activeLink) {
-      activeLink.setAttribute("aria-current", "page");
-    }
+    var activeLink = document.querySelector(".sidebar .nav-link.active, .nav-pills .nav-link.active");
+    if (activeLink) activeLink.setAttribute("aria-current", "page");
   }
 
   document.addEventListener("click", function (e) {
-    var navLink =
-      e.target &&
-      (e.target.closest(".sidebar .nav-link") ||
-        e.target.closest(".nav-pills .nav-link"));
+    var navLink = e.target && (e.target.closest(".sidebar .nav-link") || e.target.closest(".nav-pills .nav-link"));
     if (!navLink) return;
-
-    document
-      .querySelectorAll(".sidebar .nav-link, .nav-pills .nav-link")
-      .forEach(function (link) {
-        link.classList.remove("active");
-        link.removeAttribute("aria-current");
-      });
-
+    document.querySelectorAll(".sidebar .nav-link, .nav-pills .nav-link").forEach(function (link) {
+      link.classList.remove("active");
+      link.removeAttribute("aria-current");
+    });
     navLink.classList.add("active");
     navLink.setAttribute("aria-current", "page");
   });
@@ -374,85 +243,44 @@ document.addEventListener("DOMContentLoaded", function () {
       link.addEventListener("mouseleave", onMenuMouseLeave);
     }
   }
+  function onMenuMouseEnter() { if (!this.classList.contains("active")) { this.style.backgroundColor = "#e9ecef"; this.style.transition = "all 0.2s"; } }
+  function onMenuMouseLeave() { if (!this.classList.contains("active")) { this.style.backgroundColor = ""; } }
 
-  function onMenuMouseEnter() {
-    if (!this.classList.contains("active")) {
-      this.style.backgroundColor = "#e9ecef";
-      this.style.transition = "all 0.2s";
-    }
-  }
-
-  function onMenuMouseLeave() {
-    if (!this.classList.contains("active")) {
-      this.style.backgroundColor = "";
-    }
-  }
-
-  /* ══════════════════════════════════════════════════
-     BADGE VERSION
-  ══════════════════════════════════════════════════ */
   function injectVersionBadge() {
-    var version = document.body
-      ? document.body.getAttribute("data-version")
-      : null;
+    var version = document.body ? document.body.getAttribute("data-version") : null;
     if (!version || document.getElementById("appVersionBadge")) return;
-
     var badge = document.createElement("div");
     badge.id = "appVersionBadge";
     badge.textContent = "v" + version;
     document.body.appendChild(badge);
   }
 
-  /* ══════════════════════════════════════════════════
-     INITIALISATION
-  ══════════════════════════════════════════════════ */
   function init() {
-    resolveDOM();
-    createOverlay();
-    restoreDesktopState();
-    bindNavLinks();
-    injectVersionBadge();
-
-    setTimeout(function () {
-      setActiveMenu();
-      addMenuHoverEffect();
-    }, 100);
+    resolveDOM(); createOverlay(); restoreDesktopState(); bindNavLinks(); injectVersionBadge();
+    setTimeout(function () { setActiveMenu(); addMenuHoverEffect(); }, 100);
   }
 
-  if (document.readyState === "loading") {
-    document.addEventListener("DOMContentLoaded", init);
-  } else {
-    init();
-  }
+  if (document.readyState === "loading") document.addEventListener("DOMContentLoaded", init);
+  else init();
 
   window.setActiveMenu = setActiveMenu;
-  window.refreshActiveMenu = function () {
-    setTimeout(setActiveMenu, 50);
-  };
+  window.refreshActiveMenu = function () { setTimeout(setActiveMenu, 50); };
 })();
 
 /* ══════════════════════════════════════════════════
    i18n — Délégué au module i18n.js
-   (le dictionnaire est injecté par le serveur via window.__I18N__)
 ══════════════════════════════════════════════════ */
-// Les fonctions t(), applyTranslations() et setLanguage() sont
-// désormais fournies par /_assets/js/i18n.js, chargé avant global.js.
-// On garde uniquement la restauration du sélecteur (si non présent serveur).
 (function initLangSelectorUI() {
   var sel = document.getElementById("langSelect");
   if (!sel) return;
-  // La valeur courante est déjà "selected" côté serveur.
   sel.addEventListener("change", function () {
-    if (typeof window.setLanguage === "function") {
-      window.setLanguage(this.value);
-    }
+    if (typeof window.setLanguage === "function") window.setLanguage(this.value);
   });
 })();
 
 // ─────────────────────────────────────────────
-// SPINNER - Version unifiée
+// SPINNER
 // ─────────────────────────────────────────────
-// ✅ Éviter la duplication
 if (!window._spinnerDefined) {
   window._spinnerDefined = true;
 
@@ -464,7 +292,6 @@ if (!window._spinnerDefined) {
     s.style.opacity = "0";
     s.setAttribute("aria-hidden", "true");
   }
-
   function showSpinner() {
     var s = document.getElementById("spinnerOverlay");
     if (!s) return;
@@ -473,35 +300,19 @@ if (!window._spinnerDefined) {
     s.style.display = "flex";
     s.removeAttribute("aria-hidden");
   }
+  function hideSpinner() { forceHideSpinner(); }
 
-  function hideSpinner() {
-    forceHideSpinner();
-  }
-
-  // ============================================================================
-  // COULEUR DU SPINNER
-  // ============================================================================
-
-  /**
-   * Change la couleur de la roue du spinner.
-   * @param {string} color - Une couleur CSS (ex: '#dc3545', 'blue', 'rgb(255,0,0)')
-   */
   function setSpinnerColor(color) {
     if (!color) return;
     document.documentElement.style.setProperty("--spinner-color", color);
     console.log("🎨 Couleur spinner →", color);
   }
-
-  /**
-   * Réinitialise la couleur du spinner à sa valeur par défaut (vert).
-   */
   function resetSpinnerColor() {
     document.documentElement.style.removeProperty("--spinner-color");
   }
 
   window.setSpinnerColor = setSpinnerColor;
   window.resetSpinnerColor = resetSpinnerColor;
-
   window.forceHideSpinner = forceHideSpinner;
   window.showSpinner = showSpinner;
   window.hideSpinner = hideSpinner;
@@ -521,173 +332,165 @@ function ajax(url, payload) {
 function updateSortieBadge(pending) {
   var badge = document.getElementById("sortiePendingCount");
   if (!badge) return;
-
   function render(value) {
     var count = Number(value || 0);
     badge.textContent = count > 0 ? String(count) : "";
     badge.style.display = count > 0 ? "inline-flex" : "none";
   }
-
-  if (pending !== undefined && pending !== null) {
-    render(pending);
-    return;
-  }
-
+  if (pending !== undefined && pending !== null) { render(pending); return; }
   fetch(apiUrl("/pages/modules/sorties/handlers/GetSortieStats.ashx"))
     .then(function (response) {
       if (!response.ok) throw new Error("Erreur HTTP " + response.status);
       return response.json();
     })
-    .then(function (data) {
-      if (data.success) render(data.pending);
-    })
+    .then(function (data) { if (data.success) render(data.pending); })
     .catch(function () {});
 }
 window.updateSortieBadge = updateSortieBadge;
-
-document.addEventListener("DOMContentLoaded", function () {
-  updateSortieBadge();
-});
+document.addEventListener("DOMContentLoaded", function () { updateSortieBadge(); });
 
 // ============================================================================
-// CONSTRUCTION D'URL SÉCURISÉE (ANTI MIXED-CONTENT)
+// ✅ CONSTRUCTION D'URL — VERSION CORRIGÉE
 // ============================================================================
-// ✅ BUG CORRIGÉ : derrière un tunnel ngrok (ngrok http PORT), le serveur
-// IIS local tourne en HTTP et ne sait pas qu'il est exposé en HTTPS.
-// Toute URL absolue construite côté serveur (redirections, en-têtes Location,
-// liens générés) ou résolue dans certains contextes navigateur peut donc
-// hériter du scheme "http://" alors que la page est chargée en "https://",
-// ce qui déclenche un blocage "Mixed Content".
-//
-// apiUrl() reconstruit systématiquement l'URL avec le PROTOCOLE ET L'HÔTE
-// RÉELS de la page actuelle (window.location), quel que soit le scheme
-// d'origine du chemin fourni. Cela neutralise le problème à la source,
-// peu importe d'où vient l'incohérence (cache, proxy, réponse serveur...).
+// Bug corrigé :
+//   1. Le hoisting de `var path` écrasait le paramètre `path`.
+//   2. On délègue maintenant à APP_CONFIG.buildApiUrl quand disponible
+//      (cohérent avec loaders.js).
+// ============================================================================
 function apiUrl(path) {
   if (!path) return path;
   if (path.startsWith("http://") || path.startsWith("https://")) return path;
-  // Détection automatique si BASE_PATH n'est pas défini
+
+  // ⚠️ FIX HOISTING : variable locale renommée → n'écrase plus le paramètre
   if (typeof window.BASE_PATH === "undefined") {
-    var path = window.location.pathname;
-    var match = path.match(/^(.*?)\/pages\//);
+    var locationPath = window.location.pathname;
+    var match = locationPath.match(/^(.*?)\/pages\//);
     window.BASE_PATH = match ? match[1] + "/" : "";
   }
 
   var base = window.BASE_PATH || "";
+
+  // ✅ Cas chemin absolu (commence par /)
   if (path.startsWith("/")) {
-    // Si base se termine par '/', on l'enlève pour éviter un double slash
-    if (base.endsWith("/")) base = base.slice(0, -1);
-    return window.location.origin + base + path;
+    // Évite le double base si déjà présent
+    var strippedBase = base.endsWith("/") ? base.slice(0, -1) : base;
+    if (strippedBase && strippedBase !== "" && path.startsWith(strippedBase + "/")) {
+      return window.location.origin + path;
+    }
+    return window.location.origin + strippedBase + path;
   }
-  // Chemin relatif : résolution standard
+
+  // ✅ Cas chemin relatif simple → déléguer à APP_CONFIG si possible
+  if (window.APP_CONFIG && typeof window.APP_CONFIG.buildApiUrl === "function") {
+    try {
+      return window.APP_CONFIG.buildApiUrl(path);
+    } catch (e) {
+      console.warn('[apiUrl] APP_CONFIG.buildApiUrl a échoué, fallback :', e.message);
+    }
+  }
+
   return new URL(path, window.location.href).toString();
 }
 window.apiUrl = apiUrl;
 
-// ✅ Garde-fou supplémentaire : intercepter fetch() pour réécrire
-// automatiquement toute requête http:// vers https:// quand la page est
-// elle-même chargée en https://. Cela protège même les appels qui auraient
-// été oubliés lors d'une mise à jour future du code, sans rien casser
-// pour les requêtes déjà correctes.
+// ✅ Patch mixed-content (inchangé)
 (function patchFetchForMixedContent() {
   if (window._fetchPatchedForHttps) return;
   window._fetchPatchedForHttps = true;
-
   var originalFetch = window.fetch;
   window.fetch = function (input, init) {
     try {
-      if (
-        window.location.protocol === "https:" &&
-        typeof input === "string" &&
-        input.indexOf("http://") === 0
-      ) {
-        console.warn(
-          "⚠️ Requête http:// interceptée et corrigée en https:// →",
-          input,
-        );
+      if (window.location.protocol === "https:" && typeof input === "string" && input.indexOf("http://") === 0) {
+        console.warn("⚠️ Requête http:// interceptée → https:// :", input);
         input = "https://" + input.substring("http://".length);
       }
-    } catch (e) {
-      /* ignorer et laisser fetch gérer l'erreur normalement */
-    }
+    } catch (e) {}
     return originalFetch.call(this, input, init);
   };
 })();
 
 // ============================================================================
-// MODE SOMBRE (DARK MODE)
+// MODE SOMBRE
 // ============================================================================
-
 function initDarkMode() {
   const toggle = document.getElementById("toggleDarkMode");
   if (!toggle) return;
 
+  const html = document.documentElement;
+
+  // ─── Applique le thème sauvegardé au chargement ───
   const savedMode = localStorage.getItem("darkMode");
   if (savedMode === "enabled") {
+    html.classList.add("dark-mode");
     document.body.classList.add("dark-mode");
     toggle.checked = true;
   }
 
+  // ─── Toggle ───
   toggle.addEventListener("change", function () {
-    if (this.checked) {
-      document.body.classList.add("dark-mode");
-      localStorage.setItem("darkMode", "enabled");
-    } else {
-      document.body.classList.remove("dark-mode");
-      localStorage.setItem("darkMode", "disabled");
-    }
+    const isDark = this.checked;
+
+    // 1. Désactive TOUTES les transitions
+    html.classList.add("theme-switching");
+
+    // 2. Applique la classe sur <html> ET <body> (instantané)
+    html.classList.toggle("dark-mode", isDark);
+    document.body.classList.toggle("dark-mode", isDark);
+
+    // 3. Persiste le choix
+    localStorage.setItem("darkMode", isDark ? "enabled" : "disabled");
+
+    // 4. Force un reflow pour peindre la nouvelle frame AVANT de réactiver
+    void html.offsetHeight;
+
+    // 5. Réactive les transitions APRÈS 2 frames (double rAF)
+    //    → plus fiable que setTimeout : garantit que la peinture est finie
+    requestAnimationFrame(function () {
+      requestAnimationFrame(function () {
+        html.classList.remove("theme-switching");
+      });
+    });
   });
 }
 
 // ============================================================================
-// TREE VIEW / ACCORDÉON
+// TREE VIEW
 // ============================================================================
-
 function initTreeview() {
   var treeviewToggles = document.querySelectorAll(".treeview-toggle");
-
   for (var i = 0; i < treeviewToggles.length; i++) {
     var toggle = treeviewToggles[i];
     toggle.removeEventListener("click", handleTreeviewClick);
     toggle.addEventListener("click", handleTreeviewClick);
   }
-
   var activeLink = document.querySelector(".nav-treeview .nav-link.active");
   if (activeLink) {
     var parentTreeview = activeLink.closest(".has-treeview");
-    if (parentTreeview) {
-      parentTreeview.classList.add("open");
-    }
+    if (parentTreeview) parentTreeview.classList.add("open");
   }
 }
-
 function handleTreeviewClick(e) {
   e.preventDefault();
   e.stopPropagation();
-
   var parentItem = this.closest(".has-treeview");
-  if (parentItem) {
-    parentItem.classList.toggle("open");
-  }
+  if (parentItem) parentItem.classList.toggle("open");
 }
-
-// ✅ Initialiser Treeview après chargement du DOM
-document.addEventListener("DOMContentLoaded", function () {
-  initTreeview();
-  // initDarkMode est déjà appelé plus haut
-});
+document.addEventListener("DOMContentLoaded", function () { initTreeview(); });
 
 // ============================================================================
-// MAINTENANCE - 2 VÉRIFICATIONS UNIQUEMENT (VERSION UNIFIÉE GLOBALE)
+// ✅ MAINTENANCE — VERSION CORRIGÉE
+// ============================================================================
+// Changement clé : plus de chemin absolu codé en dur.
+//   AVANT : const API_BASE = "/pages/administrations/utilisateur/api/BackupDatabase.aspx"
+//   APRÈS : const BACKUP_ENDPOINT = "BackupDatabase.aspx"
+// L'URL est construite par APP_CONFIG.buildApiUrl (cohérent avec loaders.js).
 // ============================================================================
 
-const API_BASE = "/pages/administrations/utilisateur/api/BackupDatabase.aspx";
+const BACKUP_ENDPOINT = "BackupDatabase.aspx";   // ← juste le nom de fichier
 let countdownTimer = null;
 let isBannerShown = false;
 
-// ─── DÉMARRAGE : 2 VÉRIFICATIONS ────────────────────────────────────
 function startMaintenanceChecker() {
-  // ✅ Éviter les doublons
   if (window._maintenanceInitialized) {
     console.log("⚠️ Maintenance déjà initialisée, ignoré");
     return;
@@ -695,34 +498,34 @@ function startMaintenanceChecker() {
   window._maintenanceInitialized = true;
 
   console.log("🔍 Vérification 1/2 - Immédiate");
-
-  // 1ère vérification immédiate
   checkStatus(1);
 
-  // 2ème vérification après 5 secondes
   setTimeout(() => {
     console.log("🔍 Vérification 2/2 - Après 5s");
     checkStatus(2);
   }, 5000);
 }
 
-// ─── VÉRIFICATION UNIQUE ────────────────────────────────────────────
 async function checkStatus(checkNumber) {
   try {
-    const url = apiUrl(`${API_BASE}?action=check&t=${Date.now()}`);
+    // ─── Construction d'URL robuste ───
+    var baseUrl;
+    if (window.APP_CONFIG && typeof window.APP_CONFIG.buildApiUrl === "function") {
+      baseUrl = window.APP_CONFIG.buildApiUrl(BACKUP_ENDPOINT);
+    } else {
+      baseUrl = apiUrl("/pages/administrations/utilisateur/api/" + BACKUP_ENDPOINT);
+    }
+
+    var url = baseUrl + "?action=check&t=" + Date.now();
+    console.log(`[checkStatus ${checkNumber}/2] →`, url);
+
     const response = await fetch(url);
     const data = await response.json();
 
     console.log(`📊 Résultat vérification ${checkNumber}/2:`, data);
 
-    // Cas 1: Maintenance exécutée
-    if (data.isExecuted) {
-      console.log("✅ Maintenance déjà exécutée");
-      clearAllBanners();
-      return;
-    }
+    if (data.isExecuted) { console.log("✅ Maintenance déjà exécutée"); clearAllBanners(); return; }
 
-    // Cas 2: Maintenance programmée → bannière de déconnexion
     if (data.isMaintenance && data.maintenanceTime) {
       const userRole = document.getElementById("hfUserRole")?.value || "";
       if (userRole !== "0" && !isBannerShown) {
@@ -733,59 +536,44 @@ async function checkStatus(checkNumber) {
       return;
     }
 
-    // Cas 3: Blocage actif → bannière de blocage
     if (data.isBlocked && data.remainingSeconds > 0) {
       showBlockedBanner(data.remainingSeconds);
       removeBanner("globalMaintenanceBanner");
       return;
     }
 
-    // Cas 4: Rien → nettoyer
     clearAllBanners();
   } catch (e) {
     console.log("⚠️ Erreur vérification:", e);
   }
 }
 
-// ─── NETTOYAGE ──────────────────────────────────────────────────────
 function clearAllBanners() {
   removeBanner("globalMaintenanceBanner");
   removeBanner("blockedBanner");
   enableInteractions();
 }
-
 function removeBanner(id) {
   const el = document.getElementById(id);
   if (el) el.remove();
 }
-
 function enableInteractions() {
-  document
-    .querySelectorAll("button, a, input, select, .nav-link, .btn")
-    .forEach((el) => {
-      el.style.pointerEvents = "";
-      el.style.opacity = "";
-    });
+  document.querySelectorAll("button, a, input, select, .nav-link, .btn").forEach((el) => {
+    el.style.pointerEvents = "";
+    el.style.opacity = "";
+  });
 }
-
 function disableInteractions() {
-  document
-    .querySelectorAll("button, a, input, select, .nav-link, .btn")
-    .forEach((el) => {
-      el.style.pointerEvents = "none";
-      el.style.opacity = "0.5";
-    });
+  document.querySelectorAll("button, a, input, select, .nav-link, .btn").forEach((el) => {
+    el.style.pointerEvents = "none";
+    el.style.opacity = "0.5";
+  });
 }
 
-// ─── BANNIÈRE MAINTENANCE ──────────────────────────────────────────
 function showMaintenanceBanner(maintenanceTime) {
   if (document.getElementById("globalMaintenanceBanner")) return;
-
-  const version =
-    document.querySelector("[data-version]")?.getAttribute("data-version") ||
-    "2.1.17";
+  const version = document.querySelector("[data-version]")?.getAttribute("data-version") || "2.1.17";
   const banner = createBannerElement("globalMaintenanceBanner");
-
   banner.innerHTML = `
         <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
             <div style="display: flex; align-items: center; gap: 14px;">
@@ -816,22 +604,15 @@ function showMaintenanceBanner(maintenanceTime) {
             <div id="progressBar" style="width: 0%; height: 100%; background: linear-gradient(90deg, #ffc107, #28a745); transition: width 1s linear;"></div>
         </div>
     `;
-
   document.body.appendChild(banner);
   startCountdown(maintenanceTime);
   injectStyles();
 }
 
-// ─── BANNIÈRE BLOCAGE ──────────────────────────────────────────────
 function showBlockedBanner(remainingSeconds) {
   const isLoginPage = window.location.pathname.includes("Login.aspx");
-
   let banner = document.getElementById("blockedBanner");
-  if (banner) {
-    updateBlockBanner(remainingSeconds);
-    return;
-  }
-
+  if (banner) { updateBlockBanner(remainingSeconds); return; }
   banner = createBannerElement("blockedBanner", "#dc3545");
   banner.innerHTML = `
         <div style="display: flex; align-items: center; justify-content: center; gap: 20px; flex-wrap: wrap;">
@@ -848,33 +629,19 @@ function showBlockedBanner(remainingSeconds) {
             <div id="blockProgress" style="width: ${(1 - remainingSeconds / 60) * 100}%; height: 100%; background: #ffc107; transition: width 1s linear;"></div>
         </div>
     `;
-
   document.body.appendChild(banner);
-
-  if (!isLoginPage) {
-    disableInteractions();
-  }
-
+  if (!isLoginPage) disableInteractions();
   startBlockCountdown(remainingSeconds);
   injectStyles();
 }
 
-// ─── UTILITAIRES ────────────────────────────────────────────────────
-function createBannerElement(
-  id,
-  bgColor = "linear-gradient(135deg, #dc3545 0%, #c82333 100%)",
-) {
+function createBannerElement(id, bgColor = "linear-gradient(135deg, #dc3545 0%, #c82333 100%)") {
   const banner = document.createElement("div");
   banner.id = id;
   banner.style.cssText = `
-        position: fixed;
-        bottom: 0;
-        left: 0;
-        right: 0;
-        background: ${bgColor};
-        color: white;
-        padding: 14px 20px;
-        z-index: 99999;
+        position: fixed; bottom: 0; left: 0; right: 0;
+        background: ${bgColor}; color: white;
+        padding: 14px 20px; z-index: 99999;
         font-family: 'Segoe UI', Arial, sans-serif;
         box-shadow: 0 -4px 20px rgba(0,0,0,0.3);
         animation: slideUp 0.5s ease;
@@ -888,47 +655,30 @@ function injectStyles() {
   const style = document.createElement("style");
   style.id = "maintenanceStyles";
   style.textContent = `
-        @keyframes slideUp {
-            from { transform: translateY(100%); opacity: 0; }
-            to { transform: translateY(0); opacity: 1; }
-        }
-        @keyframes pulseAlert {
-            0%, 100% { opacity: 1; }
-            50% { opacity: 0.6; }
-        }
+        @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+        @keyframes pulseAlert { 0%, 100% { opacity: 1; } 50% { opacity: 0.6; } }
     `;
   document.head.appendChild(style);
 }
 
-// ─── COMPTEURS ──────────────────────────────────────────────────────
 function startCountdown(targetTime) {
   if (countdownTimer) clearInterval(countdownTimer);
-
   const target = new Date();
   const [hours, minutes] = targetTime.split(":");
   target.setHours(parseInt(hours), parseInt(minutes), 0, 0);
   if (target < new Date()) target.setDate(target.getDate() + 1);
-
   countdownTimer = setInterval(() => {
     const diff = target - new Date();
-
-    if (diff <= 0) {
-      clearInterval(countdownTimer);
-      handleDisconnect();
-    } else {
+    if (diff <= 0) { clearInterval(countdownTimer); handleDisconnect(); }
+    else {
       const h = Math.floor(diff / 3600000);
       const m = Math.floor((diff % 3600000) / 60000);
       const s = Math.floor((diff % 60000) / 1000);
-
       const el = document.getElementById("countdownDisplay");
       const progress = document.getElementById("progressBar");
-
       if (el) {
         el.textContent = `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
-        if (diff < 60000) {
-          el.style.animation = "pulseAlert 0.5s infinite";
-          el.style.color = "#ff6b6b";
-        }
+        if (diff < 60000) { el.style.animation = "pulseAlert 0.5s infinite"; el.style.color = "#ff6b6b"; }
       }
       if (progress) {
         const totalSec = Math.floor(diff / 1000);
@@ -940,27 +690,19 @@ function startCountdown(targetTime) {
 
 function startBlockCountdown(seconds) {
   if (countdownTimer) clearInterval(countdownTimer);
-
   let remaining = seconds;
   const MAX = 60;
-
   countdownTimer = setInterval(() => {
     remaining--;
     const el = document.getElementById("blockCountdown");
     const progress = document.getElementById("blockProgress");
-
     if (el) el.textContent = remaining + "s";
-    if (progress) {
-      progress.style.width = `${Math.min(100, ((MAX - remaining) / MAX) * 100)}%`;
-    }
-
+    if (progress) progress.style.width = `${Math.min(100, ((MAX - remaining) / MAX) * 100)}%`;
     if (remaining <= 0) {
       clearInterval(countdownTimer);
       removeBanner("blockedBanner");
       enableInteractions();
-      if (window.location.pathname.includes("Login.aspx")) {
-        window.location.reload();
-      }
+      if (window.location.pathname.includes("Login.aspx")) window.location.reload();
     }
   }, 1000);
 }
@@ -969,12 +711,9 @@ function updateBlockBanner(remaining) {
   const el = document.getElementById("blockCountdown");
   const progress = document.getElementById("blockProgress");
   if (el) el.textContent = remaining + "s";
-  if (progress) {
-    progress.style.width = `${Math.min(100, ((60 - remaining) / 60) * 100)}%`;
-  }
+  if (progress) progress.style.width = `${Math.min(100, ((60 - remaining) / 60) * 100)}%`;
 }
 
-// ─── DÉCONNEXION ──────────────────────────────────────────────────
 function handleDisconnect() {
   const banner = document.getElementById("globalMaintenanceBanner");
   if (banner) {
@@ -990,41 +729,22 @@ function handleDisconnect() {
             </div>
         `;
   }
-
   clearAllBanners();
-  setTimeout(() => {
-    window.location.href = "../../../auth/Login.aspx?msg=maintenance";
-  }, 5000);
+  setTimeout(() => { window.location.href = "../../../auth/Login.aspx?msg=maintenance"; }, 5000);
 }
 
-// ─── EXPOSITION GLOBALE ────────────────────────────────────────────
 window.startMaintenanceChecker = startMaintenanceChecker;
 
-// ─── DÉMARRAGE AUTOMATIQUE DE LA MAINTENANCE ──────────────────────
-// ✅ Version robuste qui fonctionne sur TOUTES les pages SANS jQuery
-
 function initMaintenance() {
-  if (window._maintenanceInitialized) {
-    return;
-  }
-
-  // Attendre que le DOM soit prêt
-  if (
-    document.readyState === "complete" ||
-    document.readyState === "interactive"
-  ) {
+  if (window._maintenanceInitialized) return;
+  if (document.readyState === "complete" || document.readyState === "interactive") {
     setTimeout(startMaintenanceChecker, 300);
   } else {
-    document.addEventListener("DOMContentLoaded", function () {
-      setTimeout(startMaintenanceChecker, 300);
-    });
+    document.addEventListener("DOMContentLoaded", function () { setTimeout(startMaintenanceChecker, 300); });
   }
 }
-
-// Démarrer la maintenance
 initMaintenance();
 
-// Fallback après 3 secondes si pas démarré
 setTimeout(function () {
   if (!window._maintenanceInitialized) {
     console.log("🔵 Forçage maintenance (fallback)");
@@ -1033,52 +753,35 @@ setTimeout(function () {
 }, 3000);
 
 // ============================================================================
-// GESTION DES MODALS
+// MODALS
 // ============================================================================
-
 function openModal(id) {
   const modal = document.getElementById(id);
   if (modal) {
     modal.style.display = "flex";
     document.body.style.overflow = "hidden";
-    if (id === "editHistoriqueModal") {
-      modal.style.zIndex = "999999";
-    } else {
-      modal.style.zIndex = "9999";
-    }
+    modal.style.zIndex = id === "editHistoriqueModal" ? "999999" : "9999";
     const modalContent = modal.querySelector(".modal-content");
-    if (modalContent) {
-      modalContent.style.zIndex = modal.style.zIndex;
-    }
+    if (modalContent) modalContent.style.zIndex = modal.style.zIndex;
   }
 }
-
 function closeModal(id) {
   const modal = document.getElementById(id);
   if (modal) {
     modal.style.display = "none";
-    const anyOpen = [
-      "paymentModal",
-      "editHistoriqueModal",
-      "tarifModal",
-      "restoreModal",
-    ].some(function (mid) {
+    const anyOpen = ["paymentModal", "editHistoriqueModal", "tarifModal", "restoreModal"].some(function (mid) {
       const m = document.getElementById(mid);
       return m && m.style.display === "flex";
     });
-    if (!anyOpen) {
-      document.body.style.overflow = "";
-    }
+    if (!anyOpen) document.body.style.overflow = "";
   }
 }
 
-// ============================================
-// GESTION DU SÉLECTEUR DE LANGUE - VERSION .NET 4.0
-// ============================================
+// ============================================================================
+// SÉLECTEUR DE LANGUE
+// ============================================================================
 document.addEventListener("DOMContentLoaded", function () {
   console.log("🔍 Initialisation du sélecteur de langue...");
-
-  // Récupérer tous les sélecteurs
   var selectors = document.querySelectorAll(".language-selector");
   console.log("📦 Sélecteurs trouvés:", selectors.length);
 
@@ -1086,148 +789,87 @@ document.addEventListener("DOMContentLoaded", function () {
     var selector = selectors[i];
     var btn = selector.querySelector(".btn");
     var dropdown = selector.querySelector(".dropdown-menu");
-
     if (btn && dropdown) {
       console.log("✅ Sélecteur " + i + " initialisé");
-
-      // Toggle du dropdown - utiliser une closure pour conserver la référence
       (function (btnRef, dropdownRef) {
         btnRef.addEventListener("click", function (e) {
-          e.preventDefault();
-          e.stopPropagation();
+          e.preventDefault(); e.stopPropagation();
           dropdownRef.classList.toggle("show");
-          console.log(
-            "📂 Dropdown toggled:",
-            dropdownRef.classList.contains("show"),
-          );
+          console.log("📂 Dropdown toggled:", dropdownRef.classList.contains("show"));
         });
       })(btn, dropdown);
     } else {
-      console.warn("⚠️ Sélecteur " + i + " incomplet:", {
-        btn: !!btn,
-        dropdown: !!dropdown,
-      });
+      console.warn("⚠️ Sélecteur " + i + " incomplet:", { btn: !!btn, dropdown: !!dropdown });
     }
   }
 
-  // Fermer le dropdown si on clique ailleurs
   document.addEventListener("click", function (e) {
-    var allDropdowns = document.querySelectorAll(
-      ".language-selector .dropdown-menu",
-    );
+    var allDropdowns = document.querySelectorAll(".language-selector .dropdown-menu");
     for (var i = 0; i < allDropdowns.length; i++) {
       var dropdown = allDropdowns[i];
       var parent = dropdown.parentNode;
-      if (parent && !parent.contains(e.target)) {
-        dropdown.classList.remove("show");
-      }
+      if (parent && !parent.contains(e.target)) dropdown.classList.remove("show");
     }
   });
 
-  // ✅ Fonction robuste : conserve les autres paramètres, évite les doublons, valide la culture.
   window.setLanguage = function (culture) {
     if (!culture) return;
-
     var normalizedCulture = String(culture).trim();
     if (!normalizedCulture) return;
-
     var supportedCultures = ["fr", "en", "mg"];
-    var baseCulture = normalizedCulture
-      .replace("_", "-")
-      .split("-")[0]
-      .toLowerCase();
-    var finalCulture =
-      supportedCultures.indexOf(baseCulture) !== -1 ? baseCulture : "fr";
-
+    var baseCulture = normalizedCulture.replace("_", "-").split("-")[0].toLowerCase();
+    var finalCulture = supportedCultures.indexOf(baseCulture) !== -1 ? baseCulture : "fr";
     var url = new URL(window.location.href);
     var params = new URLSearchParams(url.search);
     params.delete("lang");
     params.set("lang", finalCulture);
     url.search = params.toString();
-
     window.location.href = url.toString();
   };
-
   console.log("✅ Sélecteur de langue initialisé");
 });
 
 // ============================================================================
-// AJOUTS POUR LE MODULE ARTICLES (CRUD)
+// HELPERS ARTICLES
 // ============================================================================
-
-/**
- * fetchJsonSafe - Appel fetch robuste avec gestion des sessions et du JSON.
- */
 if (typeof window.fetchJsonSafe !== "function") {
   window.fetchJsonSafe = async function (url, options = {}) {
     const response = await fetch(url, {
       ...options,
       credentials: "include",
       headers: {
-        "Content-Type":
-          options && options.body && typeof options.body === "string"
-            ? "application/json; charset=utf-8"
-            : (options.headers && options.headers["Content-Type"]) ||
-              "application/json; charset=utf-8",
+        "Content-Type": options && options.body && typeof options.body === "string"
+          ? "application/json; charset=utf-8"
+          : (options.headers && options.headers["Content-Type"]) || "application/json; charset=utf-8",
         "X-Requested-With": "XMLHttpRequest",
         ...(options.headers || {}),
       },
     });
-
-    // Gestion des sessions expirées
     if (response.status === 401 || response.status === 403) {
       if (typeof Swal !== "undefined") {
-        await Swal.fire({
-          icon: "warning",
-          title: "Session expirée",
-          text: "Votre session a expiré. Veuillez vous reconnecter.",
-          confirmButtonText: "Se reconnecter",
-        });
+        await Swal.fire({ icon: "warning", title: "Session expirée", text: "Votre session a expiré. Veuillez vous reconnecter.", confirmButtonText: "Se reconnecter" });
       }
       window.location.href = "/auth/Login.aspx?msg=session_expired";
       throw new Error("Session expirée");
     }
-
     if (!response.ok) {
       const text = await response.text();
-      if (
-        text.trim().startsWith("<!DOCTYPE") ||
-        text.trim().startsWith("<html")
-      ) {
-        throw new Error(
-          `Erreur serveur ${response.status} : le serveur a renvoyé une page HTML. Vérifiez les logs serveur.`,
-        );
+      if (text.trim().startsWith("<!DOCTYPE") || text.trim().startsWith("<html")) {
+        throw new Error(`Erreur serveur ${response.status} : le serveur a renvoyé une page HTML. Vérifiez les logs serveur.`);
       }
-      throw new Error(
-        `Erreur HTTP ${response.status} : ${text.substring(0, 200)}`,
-      );
+      throw new Error(`Erreur HTTP ${response.status} : ${text.substring(0, 200)}`);
     }
-
     const contentType = response.headers.get("content-type") || "";
     if (!contentType.includes("application/json")) {
       const text = await response.text();
-      if (
-        text.includes("Login.aspx") ||
-        text.includes("login.aspx") ||
-        (text.trim().startsWith("<") && response.url.includes("Login"))
-      ) {
+      if (text.includes("Login.aspx") || text.includes("login.aspx") || (text.trim().startsWith("<") && response.url.includes("Login"))) {
         window.location.href = "/auth/Login.aspx?msg=session_expired";
         throw new Error("Session expirée - redirection vers login");
       }
-      console.error(
-        "Réponse non JSON (Content-Type:",
-        contentType,
-        "):",
-        text.substring(0, 500),
-      );
-      throw new Error(
-        "Le serveur a renvoyé une réponse non JSON. Vérifiez l'état du serveur.",
-      );
+      console.error("Réponse non JSON (Content-Type:", contentType, "):", text.substring(0, 500));
+      throw new Error("Le serveur a renvoyé une réponse non JSON. Vérifiez l'état du serveur.");
     }
-
-    try {
-      return await response.json();
-    } catch (e) {
+    try { return await response.json(); } catch (e) {
       const text = await response.text();
       console.error("Erreur de parsing JSON :", text.substring(0, 500));
       throw new Error("Réponse JSON invalide.");
@@ -1235,58 +877,26 @@ if (typeof window.fetchJsonSafe !== "function") {
   };
 }
 
-/**
- * showErrorToast - Affiche une notification d'erreur (toast).
- */
 if (typeof window.showErrorToast !== "function") {
   window.showErrorToast = function (message, title) {
     if (typeof Swal !== "undefined") {
-      Swal.mixin({
-        toast: true,
-        position: "top-end",
-        showConfirmButton: false,
-        timer: 4000,
-        timerProgressBar: true,
-        icon: "error",
-        title: title || "Erreur",
-        text: message,
-      }).fire();
-    } else {
-      alert("Erreur: " + message);
-    }
+      Swal.mixin({ toast: true, position: "top-end", showConfirmButton: false, timer: 4000, timerProgressBar: true, icon: "error", title: title || "Erreur", text: message }).fire();
+    } else { alert("Erreur: " + message); }
   };
 }
 
-/**
- * escapeHtml - Échappe les caractères HTML pour prévenir XSS.
- */
 if (typeof window.escapeHtml !== "function") {
   window.escapeHtml = function (str) {
     if (!str) return "";
-    return String(str)
-      .replace(/&/g, "&amp;")
-      .replace(/</g, "&lt;")
-      .replace(/>/g, "&gt;")
-      .replace(/"/g, "&quot;")
-      .replace(/'/g, "&#039;");
+    return String(str).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
   };
 }
 
-/**
- * setVal / getVal - Gestion simplifiée des champs de formulaire.
- */
 if (typeof window.setVal !== "function") {
   window.setVal = function (id, value) {
     var el = document.getElementById(id);
     if (el) {
-      if (
-        el.tagName === "SELECT" ||
-        el.type === "text" ||
-        el.type === "number" ||
-        el.type === "password" ||
-        el.type === "hidden" ||
-        el.tagName === "TEXTAREA"
-      ) {
+      if (el.tagName === "SELECT" || el.type === "text" || el.type === "number" || el.type === "password" || el.type === "hidden" || el.tagName === "TEXTAREA") {
         el.value = value !== undefined && value !== null ? value : "";
       } else if (el.type === "checkbox" || el.type === "radio") {
         el.checked = !!value;
@@ -1294,21 +904,14 @@ if (typeof window.setVal !== "function") {
     }
   };
 }
-
 if (typeof window.getVal !== "function") {
   window.getVal = function (id) {
     var el = document.getElementById(id);
     if (!el) return "";
-    if (el.type === "checkbox" || el.type === "radio") {
-      return el.checked ? el.value || "on" : "";
-    }
+    if (el.type === "checkbox" || el.type === "radio") return el.checked ? el.value || "on" : "";
     return el.value || "";
   };
 }
-
-/**
- * clearFieldErrors - Efface les messages d'erreur sous les champs.
- */
 if (typeof window.clearFieldErrors !== "function") {
   window.clearFieldErrors = function (ids) {
     if (!ids) return;
@@ -1321,21 +924,13 @@ if (typeof window.clearFieldErrors !== "function") {
     });
   };
 }
-
-/**
- * showFieldError - Affiche un message d'erreur sous un champ.
- */
 if (typeof window.showFieldError !== "function") {
   window.showFieldError = function (id, message) {
     var field = document.getElementById(id);
     if (field) field.classList.add("is-invalid");
     var errorEl = document.getElementById(id + "_error");
-    if (errorEl) {
-      errorEl.textContent = message;
-      errorEl.style.color = "#dc3545";
-      errorEl.style.fontSize = "0.875em";
-    } else {
-      // Créer l'élément d'erreur s'il n'existe pas
+    if (errorEl) { errorEl.textContent = message; errorEl.style.color = "#dc3545"; errorEl.style.fontSize = "0.875em"; }
+    else {
       var parent = field ? field.parentNode : null;
       if (parent) {
         var newError = document.createElement("div");
@@ -1347,37 +942,17 @@ if (typeof window.showFieldError !== "function") {
     }
   };
 }
-
-/**
- * Stubs pour les fonctions du module articles (peuvent être redéfinies).
- */
-if (typeof window.updateStatsCards !== "function") {
-  window.updateStatsCards = function () {
-    // Peut être redéfini dans la page
-  };
-}
-if (typeof window.renderTable !== "function") {
-  window.renderTable = function () {
-    // Peut être redéfini dans la page
-  };
-}
-if (typeof window.applyFilters !== "function") {
-  window.applyFilters = function () {
-    // Peut être redéfini dans la page
-  };
-}
+if (typeof window.updateStatsCards !== "function") window.updateStatsCards = function () {};
+if (typeof window.renderTable !== "function") window.renderTable = function () {};
+if (typeof window.applyFilters !== "function") window.applyFilters = function () {};
 
 // ============================================================================
 // EXPOSITION GLOBALE
 // ============================================================================
-// Fonctions existantes
 window.ajax = ajax;
-// ✅ SUPPRIMÉ : window.loadLang = loadLang;  (loadLang n'existe plus — i18n.js gère)
 window.initDarkMode = initDarkMode;
 window.openModal = openModal;
 window.closeModal = closeModal;
-
-// Fonctions pour le module articles (CRUD) – ajoutées sans écraser
 window.fetchJsonSafe = window.fetchJsonSafe;
 window.showErrorToast = window.showErrorToast;
 window.escapeHtml = window.escapeHtml;

@@ -1536,5 +1536,170 @@
 
   "monnaies.confirm.delete_title": "Confirmer la suppression",
   "monnaies.confirm.delete_text": "Cette action est irréversible. Voulez-vous vraiment supprimer cette monnaie ?",
-  "monnaies.confirm.delete_yes": "Oui, supprimer"
+  "monnaies.confirm.delete_yes": "Oui, supprimer",
+
+  "menu.taux": "Taux de change",
+  "taux.title": "Taux de change",
+  "taux.list_title": "Liste des taux de change",
+  "taux.table.source": "Monnaie source",
+  "taux.table.cible": "Monnaie cible",
+  "taux.table.taux": "Taux",
+  "taux.table.date_effet": "Date d'effet",
+  "taux.table.source_info": "Informations source",
+  "taux.table.statut": "Statut",
+  "taux.table.actions": "Actions",
+
+  "taux.stat.total": "Total",
+  "taux.stat.active": "Actifs",
+  "taux.stat.inactive": "Inactifs",
+
+  "taux.btn.add": "Nouveau taux",
+  "taux.btn.pdf": "PDF",
+  "taux.btn.excel": "Excel",
+
+  "taux.filter.all_source": "Toutes les monnaies sources",
+  "taux.filter.all_target": "Toutes les monnaies cibles",
+  "taux.filter.all_status": "Tous les statuts",
+  "taux.filter.active": "Actifs",
+  "taux.filter.inactive": "Inactifs",
+
+  "taux.search_placeholder": "Rechercher par monnaie, taux ou date…",
+  "taux.reset_filters": "Réinitialiser les filtres",
+
+  "taux.rows_per_page.10": "10 / page",
+  "taux.rows_per_page.25": "25 / page",
+  "taux.rows_per_page.50": "50 / page",
+  "taux.rows_per_page.100": "100 / page",
+  "taux.rows_per_page.all": "Tout",
+
+  "taux.counter": "{n} taux affiché(s)",
+  "taux.counter.zero": "0 taux",
+
+  "taux.msg.no_data": "Aucun taux de change trouvé.",
+  "taux.msg.load_error": "Erreur lors du chargement des taux de change.",
+  "taux.msg.stats_error": "Erreur lors du chargement des statistiques.",
+  "taux.msg.added": "Taux de change ajouté avec succès.",
+  "taux.msg.updated": "Taux de change modifié avec succès.",
+  "taux.msg.deleted": "Taux de change supprimé avec succès.",
+  "taux.msg.delete_failed": "Échec de la suppression.",
+
+  "taux.msg.source_required": "La monnaie source est obligatoire.",
+  "taux.msg.cible_required": "La monnaie cible est obligatoire.",
+  "taux.msg.taux_required": "Le taux est obligatoire.",
+  "taux.msg.date_required": "La date d'effet est obligatoire.",
+  "taux.msg.currencies_different": "La monnaie source et la monnaie cible doivent être différentes.",
+
+  "taux.modal.add_title": "Nouveau taux de change",
+  "taux.modal.edit_title": "Modifier le taux de change",
+  "taux.modal.view_title": "Détails du taux de change",
+
+  "taux.modal.source_label": "Monnaie source",
+  "taux.modal.cible_label": "Monnaie cible",
+  "taux.modal.taux_label": "Taux de change",
+  "taux.modal.date_label": "Date d'effet",
+  "taux.modal.source_info_label": "Informations source",
+  "taux.modal.actif_label": "Actif",
+
+  "taux.modal.taux_placeholder": "Ex. : 1,00",
+  "taux.modal.source_info_placeholder": "Informations complémentaires sur la source…",
+
+  "taux.confirm.delete_title": "Confirmer la suppression",
+  "taux.confirm.delete_text": "Cette action est irréversible. Voulez-vous vraiment supprimer ce taux de change ?",
+  "taux.confirm.delete_yes": "Oui, supprimer",
+
+  "taux.status.active": "Actif",
+  "taux.status.inactive": "Inactif",
+
+  "exercices.title": "Exercices comptables",
+  "exercices.list_title": "Liste des exercices comptables",
+
+  "exercices.stat.total": "Total",
+  "exercices.stat.ouverts": "Ouverts",
+  "exercices.stat.clotures": "Clôturés",
+  "exercices.stat.archives": "Archivés",
+
+  "exercices.btn.add": "Nouvel exercice",
+  "exercices.btn.pdf": "PDF",
+  "exercices.btn.excel": "Excel",
+
+  "exercices.filter.all_status": "Tous les statuts",
+  "exercices.filter.all_active": "Tous les états",
+  "exercices.filter.active": "Actifs",
+  "exercices.filter.inactive": "Inactifs",
+
+  "exercices.search_placeholder": "Rechercher par code ou libellé…",
+  "exercices.reset_filters": "Réinitialiser les filtres",
+
+  "exercices.rows_per_page.10": "10 / page",
+  "exercices.rows_per_page.25": "25 / page",
+  "exercices.rows_per_page.50": "50 / page",
+  "exercices.rows_per_page.100": "100 / page",
+  "exercices.rows_per_page.all": "Tout",
+
+  "exercices.counter": "{n} exercice(s) affiché(s)",
+  "exercices.counter.zero": "0 exercice",
+
+  "exercices.table.code": "Code",
+  "exercices.table.libelle": "Libellé",
+  "exercices.table.date_debut": "Date de début",
+  "exercices.table.date_fin": "Date de fin",
+  "exercices.table.duree": "Durée",
+  "exercices.table.statut": "Statut",
+  "exercices.table.active": "Actif",
+  "exercices.table.actions": "Actions",
+
+  "exercices.status.ouvert": "Ouvert",
+  "exercices.status.cloture": "Clôturé",
+  "exercices.status.archive": "Archivé",
+  "exercices.status.actif": "Actif",
+  "exercices.status.inactif": "Inactif",
+
+  "exercices.action.view": "Voir les détails",
+  "exercices.action.cloturer": "Clôturer",
+  "exercices.action.reouvrir": "Rouvrir",
+
+  "exercices.modal.add_title": "Nouvel exercice comptable",
+  "exercices.modal.edit_title": "Modifier l'exercice comptable",
+  "exercices.modal.view_title": "Détails de l'exercice comptable",
+
+  "exercices.modal.code_label": "Code",
+  "exercices.modal.code_hint": "Code unique de l'exercice comptable",
+  "exercices.modal.code_placeholder": "Ex. : 2026",
+  "exercices.modal.libelle_label": "Libellé",
+  "exercices.modal.libelle_placeholder": "Ex. : Exercice comptable 2026",
+  "exercices.modal.date_debut_label": "Date de début",
+  "exercices.modal.date_fin_label": "Date de fin",
+  "exercices.modal.statut_label": "Statut",
+  "exercices.modal.statut_hint": "Un exercice clôturé ne peut plus être modifié",
+  "exercices.modal.active_label": "Actif",
+
+  "exercices.msg.added": "Exercice comptable ajouté avec succès.",
+  "exercices.msg.updated": "Exercice comptable modifié avec succès.",
+  "exercices.msg.deleted": "Exercice comptable supprimé avec succès.",
+  "exercices.msg.load_error": "Erreur lors du chargement des exercices comptables.",
+  "exercices.msg.no_data": "Aucun exercice comptable trouvé.",
+  "exercices.msg.delete_failed": "Échec de la suppression.",
+  "exercices.msg.clotured": "Exercice comptable clôturé avec succès.",
+  "exercices.msg.reouvert": "Exercice comptable rouvert avec succès.",
+
+  "exercices.msg.code_required": "Le code est obligatoire.",
+  "exercices.msg.code_too_long": "Le code est trop long.",
+  "exercices.msg.libelle_required": "Le libellé est obligatoire.",
+  "exercices.msg.date_debut_required": "La date de début est obligatoire.",
+  "exercices.msg.date_fin_required": "La date de fin est obligatoire.",
+  "exercices.msg.date_fin_after_debut": "La date de fin doit être postérieure à la date de début.",
+
+  "exercices.confirm.delete_title": "Confirmer la suppression",
+  "exercices.confirm.delete_text": "Cette action est irréversible. Voulez-vous vraiment supprimer cet exercice comptable ?",
+  "exercices.confirm.delete_yes": "Oui, supprimer",
+
+  "exercices.confirm.cloturer_title": "Confirmer la clôture",
+  "exercices.confirm.cloturer_html": "Voulez-vous vraiment clôturer cet exercice comptable ?<br><strong>Cette opération est irréversible.</strong>",
+  "exercices.confirm.cloturer_yes": "Oui, clôturer",
+
+  "exercices.confirm.reouvrir_title": "Confirmer la réouverture",
+  "exercices.confirm.reouvrir_html": "Voulez-vous vraiment rouvrir cet exercice comptable ?",
+  "exercices.confirm.reouvrir_yes": "Oui, rouvrir",
+
+  "menu.exercices": "Exercices"
 }

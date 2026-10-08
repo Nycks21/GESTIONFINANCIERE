@@ -1,0 +1,317 @@
+@charset "UTF-8";
+
+/* ==========================================================================
+   Page d'erreur 500 — feuille de styles dédiée
+   À charger APRÈS adminlte.min.css
+   ========================================================================== */
+
+:root {
+    --ep-primary:      #2563eb;
+    --ep-primary-dark: #1d4ed8;
+    --ep-primary-soft: #eff4ff;
+    --ep-navy:         #16264a;
+    --ep-text:         #334155;
+    --ep-muted:        #64748b;
+    --ep-border:       #e2e8f0;
+    --ep-surface:      #ffffff;
+    --ep-radius:       12px;
+}
+
+/* 1. Base ----------------------------------------------------------------- */
+
+html, body { height: 100%; }
+
+body.ep-body {
+    margin: 0;
+    background: var(--ep-surface);
+    color: var(--ep-text);
+    font-family: "Source Sans Pro", -apple-system, BlinkMacSystemFont, "Segoe UI",
+                 Roboto, "Helvetica Neue", Arial, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+
+.ep-form {
+    display: flex;
+    flex-direction: column;
+    min-height: 100vh;
+    margin: 0;
+}
+
+/* 2. En-tête -------------------------------------------------------------- */
+
+.ep-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 16px;
+    padding: 16px 40px;
+    background: var(--ep-surface);
+    border-bottom: 1px solid var(--ep-border);
+}
+
+.ep-brand {
+    display: inline-flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.15rem;
+    font-weight: 700;
+    letter-spacing: -0.2px;
+    color: var(--ep-navy);
+    text-decoration: none;
+}
+
+.ep-brand:hover { color: var(--ep-navy); text-decoration: none; }
+
+.ep-brand-mark { width: 34px; height: 34px; flex: 0 0 auto; }
+.ep-brand-accent { color: var(--ep-primary); }
+
+.ep-home-link {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.95rem;
+    color: var(--ep-muted);
+    text-decoration: none;
+    transition: color 0.18s ease;
+}
+
+.ep-home-link:hover { color: var(--ep-primary); text-decoration: none; }
+
+/* 3. Contenu principal ---------------------------------------------------- */
+
+.ep-main {
+    flex: 1 1 auto;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    align-items: center;
+    gap: 56px;
+    width: 100%;
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 48px 40px;
+}
+
+.ep-illustration { animation: epFadeUp 0.6s ease-out both; }
+
+.ep-svg {
+    display: block;
+    width: 100%;
+    height: auto;
+    max-width: 520px;
+    margin: 0 auto;
+}
+
+.ep-content { animation: epFadeUp 0.6s ease-out 0.12s both; }
+
+.ep-code {
+    margin: 0 0 4px;
+    font-size: clamp(3.5rem, 8vw, 5.5rem);
+    font-weight: 700;
+    line-height: 1;
+    letter-spacing: -3px;
+    color: var(--ep-navy);
+}
+
+.ep-title {
+    margin: 0 0 16px;
+    font-size: clamp(1.35rem, 2.6vw, 1.9rem);
+    font-weight: 700;
+    color: var(--ep-navy);
+}
+
+.ep-text {
+    max-width: 46ch;
+    margin: 0 0 24px;
+    font-size: 1.02rem;
+    line-height: 1.7;
+    color: var(--ep-muted);
+}
+
+/* 4. Encart d'aide -------------------------------------------------------- */
+
+.ep-help {
+    display: flex;
+    gap: 14px;
+    max-width: 520px;
+    margin: 0 0 28px;
+    padding: 18px 22px;
+    background: var(--ep-primary-soft);
+    border-radius: var(--ep-radius);
+}
+
+.ep-help-icon {
+    flex: 0 0 auto;
+    margin-top: 2px;
+    font-size: 1.3rem;
+    color: var(--ep-primary);
+}
+
+.ep-help-title {
+    margin: 0 0 6px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--ep-primary);
+}
+
+.ep-help-list {
+    margin: 0;
+    padding-left: 18px;
+    font-size: 0.94rem;
+    line-height: 1.8;
+    color: var(--ep-muted);
+}
+
+/* 5. Actions -------------------------------------------------------------- */
+
+.ep-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px;
+}
+
+.ep-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 9px;
+    padding: 12px 26px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-family: inherit;
+    font-size: 1rem;
+    font-weight: 600;
+    line-height: 1.2;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background-color 0.18s ease, color 0.18s ease,
+                border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.ep-btn:hover { text-decoration: none; }
+
+.ep-btn:focus-visible {
+    outline: 3px solid rgba(37, 99, 235, 0.35);
+    outline-offset: 2px;
+}
+
+.ep-btn-primary {
+    background: var(--ep-primary);
+    color: #fff;
+    box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+}
+
+.ep-btn-primary:hover {
+    background: var(--ep-primary-dark);
+    color: #fff;
+    transform: translateY(-1px);
+    box-shadow: 0 12px 24px rgba(37, 99, 235, 0.30);
+}
+
+.ep-btn-outline {
+    background: var(--ep-surface);
+    color: var(--ep-navy);
+    border-color: var(--ep-border);
+}
+
+.ep-btn-outline:hover {
+    background: #f8faff;
+    color: var(--ep-primary);
+    border-color: var(--ep-primary);
+}
+
+/* 6. Lien support --------------------------------------------------------- */
+
+.ep-support {
+    margin: 22px 0 0;
+    font-size: 0.88rem;
+    color: var(--ep-muted);
+}
+
+.ep-support a {
+    color: var(--ep-primary);
+    text-decoration: none;
+    border-bottom: 1px dotted currentColor;
+}
+
+.ep-support a:hover { border-bottom-style: solid; }
+
+/* 7. Pied de page --------------------------------------------------------- */
+
+.ep-footer {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding: 24px 20px 32px;
+    font-size: 0.85rem;
+    color: #94a3b8;
+    text-align: center;
+}
+
+.ep-footer::before,
+.ep-footer::after {
+    content: "";
+    width: 60px;
+    height: 1px;
+    background: var(--ep-border);
+}
+
+/* 8. Animations ----------------------------------------------------------- */
+
+@keyframes epFadeUp {
+    from { opacity: 0; transform: translateY(14px); }
+    to   { opacity: 1; transform: none; }
+}
+
+@keyframes epFloat {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-7px); }
+}
+
+.ep-svg-robot {
+    animation: epFloat 5s ease-in-out infinite;
+    transform-box: fill-box;
+    transform-origin: center;
+}
+
+/* 9. Responsive ----------------------------------------------------------- */
+
+@media (max-width: 900px) {
+    .ep-header { padding: 14px 20px; }
+
+    .ep-main {
+        grid-template-columns: 1fr;
+        gap: 28px;
+        padding: 32px 24px;
+        text-align: center;
+    }
+
+    .ep-illustration { max-width: 380px; margin: 0 auto; }
+
+    .ep-text,
+    .ep-help { margin-left: auto; margin-right: auto; }
+
+    .ep-help  { text-align: left; }
+    .ep-actions { justify-content: center; }
+}
+
+@media (max-width: 480px) {
+    .ep-actions { flex-direction: column; align-items: stretch; }
+    .ep-btn     { width: 100%; }
+    .ep-home-link span { display: none; }
+
+    .ep-footer::before,
+    .ep-footer::after { width: 32px; }
+}
+
+/* 10. Accessibilité ------------------------------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+    .ep-illustration,
+    .ep-content,
+    .ep-svg-robot { animation: none !important; }
+
+    .ep-btn { transition: none; }
+}

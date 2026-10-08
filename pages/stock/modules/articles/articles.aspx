@@ -6,6 +6,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <script src="../../../_assets/js/theme-init.js?v=<%=AuthHelper.Version %>"></script>
     <title>
       <%= LocalizationHelper.GetString("articles.title") %> — <%= LocalizationHelper.GetString("app.name") %>
     </title>
@@ -16,6 +17,7 @@
   </head>
 
   <body class="hold-transition" data-version="<%=AuthHelper.Version %>">
+  <script>document.body.classList.toggle("dark-mode", document.documentElement.classList.contains("dark-mode"));</script>
     <form id="articleForm" runat="server">
       <div class="wrapper">
         <%= AuthHelper.RenderTopBarHTML() %>
