@@ -2,12 +2,15 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Script.Serialization;
 using System.Web.SessionState;
 
 public class SiteAdd : IHttpHandler, IRequiresSessionState
 {
+    private static readonly Regex CodeRegex = new Regex(@"^[0-9]{2}$", RegexOptions.Compiled);
+
     public void ProcessRequest(HttpContext ctx)
     {
         ctx.Response.ContentType = "application/json";
@@ -39,10 +42,18 @@ public class SiteAdd : IHttpHandler, IRequiresSessionState
                 return;
             }
 
-            string nom = (GetString(data, "nom") ?? "").Trim();
+            string code        = (GetString(data, "code") ?? "").Trim();
+            string nom         = (GetString(data, "nom") ?? "").Trim();
             string description = (GetString(data, "description") ?? "").Trim();
-            bool enCours = GetBool(data, "enCours", false);
-            bool actif = GetBool(data, "actif", true);
+            bool   enCours     = GetBool(data, "enCours", false);
+            bool   actif       = GetBool(data, "actif", true);
+
+            // ---------- Validation CODE : exactement 2 chiffres ----------
+            if (string.IsNullOrEmpty(code) || !CodeRegex.IsMatch(code))
+            {
+                ctx.Response.Write("{\"success\":false,\"message\":\"Le code doit contenir exactement 2 chiffres (de 00 à 99).\"}");
+                return;
+            }
 
             if (string.IsNullOrWhiteSpace(nom))
             {
@@ -55,14 +66,9 @@ public class SiteAdd : IHttpHandler, IRequiresSessionState
                 return;
             }
 
-            string projetCode = AuthHelper.GetProjectCode(ctx);
-            if (string.IsNullOrEmpty(projetCode)) projetCode = "TALIM";
-            projetCode = projetCode.Trim().ToUpperInvariant().Replace(" ", "");
-
-            int userId = AuthHelper.GetUserId(ctx);
+            int    userId  = AuthHelper.GetUserId(ctx);
             string connStr = AuthHelper.ConnectionString;
-            string newId = Guid.NewGuid().ToString();
-            string code;
+            string newId   = Guid.NewGuid().ToString();
 
             using (var conn = new SqlConnection(connStr))
             {
@@ -71,41 +77,16 @@ public class SiteAdd : IHttpHandler, IRequiresSessionState
                 {
                     try
                     {
-                        // 1) Séquence
-                        string sqlSeq = @"
-                            IF NOT EXISTS (
-                                SELECT 1 FROM FSITE_SEQUENCE WITH (UPDLOCK, HOLDLOCK)
-                                WHERE PROJET_CODE = @projet
-                            )
-                            BEGIN
-                                INSERT INTO FSITE_SEQUENCE (PROJET_CODE, DERNIER_NUMERO)
-                                VALUES (@projet, 0);
-                            END
-
-                            UPDATE FSITE_SEQUENCE
-                            SET DERNIER_NUMERO = DERNIER_NUMERO + 1
-                            OUTPUT INSERTED.DERNIER_NUMERO
-                            WHERE PROJET_CODE = @projet;";
-
-                        int numero;
-                        using (var cmdSeq = new SqlCommand(sqlSeq, conn, tx))
-                        {
-                            cmdSeq.Parameters.AddWithValue("@projet", projetCode);
-                            numero = Convert.ToInt32(cmdSeq.ExecuteScalar());
-                        }
-
-                        code = string.Format("SIT-{0}-{1:D5}", projetCode, numero);
-
-                        // 2) Anti-doublon
+                        // 1) Anti-doublon sur CODE (comportement identique à l'ancien code)
                         using (var cmdCheck = new SqlCommand(
                             "SELECT COUNT(1) FROM FSITE WHERE CODE = @code", conn, tx))
                         {
                             cmdCheck.Parameters.AddWithValue("@code", code);
                             if (Convert.ToInt32(cmdCheck.ExecuteScalar()) > 0)
-                                throw new Exception("Le code généré existe déjà, veuillez réessayer.");
+                                throw new Exception("Le code « " + code + " » est déjà utilisé.");
                         }
 
-                        // 3) Si EN_COURS = 1 → clear des autres (atomique)
+                        // 2) Si EN_COURS = 1 → clear des autres (atomique)
                         if (enCours)
                         {
                             using (var cmdClear = new SqlCommand(@"
@@ -121,7 +102,7 @@ public class SiteAdd : IHttpHandler, IRequiresSessionState
                             }
                         }
 
-                        // 4) Insert
+                        // 3) Insert
                         string sqlInsert = @"
                             INSERT INTO FSITE (ID, CODE, NOM, DESCRIPTION, EN_COURS, ACTIVE, CREATED_BY, CREATED_AT)
                             VALUES (@id, @code, @nom, @description, @enCours, @active, @userId, GETDATE())";
@@ -153,7 +134,7 @@ public class SiteAdd : IHttpHandler, IRequiresSessionState
                 success = true,
                 id = newId,
                 code = code,
-                message = "Site ajouté avec succès (" + code + ")."
+                message = "Site ajouté avec succès (code " + code + ")."
             }));
         }
         catch (Exception ex)

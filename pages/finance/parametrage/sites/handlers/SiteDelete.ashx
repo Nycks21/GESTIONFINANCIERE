@@ -54,26 +54,75 @@ public class SiteDelete : IHttpHandler, IRequiresSessionState
             {
                 conn.Open();
 
-                // Vérification : le site est-il référencé par un journal ?
-                string referenceSql = @"
-                    SELECT COUNT(*)
-                    FROM FJOURNAL
-                    WHERE SITE_ID = @id AND DELETION_AT IS NULL";
-                using (var referenceCmd = new SqlCommand(referenceSql, conn))
+                // =====================================================
+                // 1) Vérifier existence + récupérer le CODE du site
+                // =====================================================
+                string code = null;
+                using (var cmdExists = new SqlCommand(
+                    "SELECT CODE FROM FSITE WHERE ID = @id AND DELETION_AT IS NULL", conn))
                 {
-                    referenceCmd.Parameters.AddWithValue("@id", id);
-                    if (Convert.ToInt32(referenceCmd.ExecuteScalar()) > 0)
+                    cmdExists.Parameters.AddWithValue("@id", id);
+                    object o = cmdExists.ExecuteScalar();
+                    if (o == null || o == DBNull.Value)
+                    {
+                        ctx.Response.Write("{\"success\":false,\"message\":\"Site introuvable ou déjà supprimé.\"}");
+                        return;
+                    }
+                    code = o.ToString();
+                }
+
+                // =====================================================
+                // 2) Protéger les sites système 00 et 01 (règle métier)
+                // =====================================================
+                if (code == "00" || code == "01")
+                {
+                    ctx.Response.Write(serializer.Serialize(new
+                    {
+                        success = false,
+                        message = "Les sites « 00 — Pour la consolidation » et « 01 — Siège » sont protégés et ne peuvent pas être supprimés."
+                    }));
+                    return;
+                }
+
+                // =====================================================
+                // 3) Vérifier les références : FJOURNAL_SITE (liaison)
+                // =====================================================
+                using (var cmdRef1 = new SqlCommand(
+                    "SELECT COUNT(*) FROM FJOURNAL_SITE WHERE SITE_ID = @id", conn))
+                {
+                    cmdRef1.Parameters.AddWithValue("@id", id);
+                    if (Convert.ToInt32(cmdRef1.ExecuteScalar()) > 0)
                     {
                         ctx.Response.Write(serializer.Serialize(new
                         {
                             success = false,
-                            message = "Impossible de supprimer : ce site est utilisé par un ou plusieurs journaux."
+                            message = "Impossible de supprimer : ce site est associé à un ou plusieurs journaux."
                         }));
                         return;
                     }
                 }
 
-                // Soft delete + nettoyage de EN_COURS
+                // =====================================================
+                // 4) Vérifier les références : FECRITURE (SITE_ID)
+                // =====================================================
+                using (var cmdRef2 = new SqlCommand(
+                    "SELECT COUNT(*) FROM FECRITURE WHERE SITE_ID = @id", conn))
+                {
+                    cmdRef2.Parameters.AddWithValue("@id", id);
+                    if (Convert.ToInt32(cmdRef2.ExecuteScalar()) > 0)
+                    {
+                        ctx.Response.Write(serializer.Serialize(new
+                        {
+                            success = false,
+                            message = "Impossible de supprimer : ce site est utilisé par une ou plusieurs écritures comptables."
+                        }));
+                        return;
+                    }
+                }
+
+                // =====================================================
+                // 5) Soft delete + nettoyage de EN_COURS
+                // =====================================================
                 string sql = @"
                     UPDATE FSITE
                     SET DELETION_AT = GETDATE(),

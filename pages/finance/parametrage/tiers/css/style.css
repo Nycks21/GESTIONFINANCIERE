@@ -1,0 +1,108 @@
+/* Module TIERS — Styles spécifiques */
+
+.tiers-nom {
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.badge-code {
+    display: inline-block;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+}
+
+/* Types tiers */
+.badge-tiers-fournisseur,
+.badge-tiers-client,
+.badge-tiers-agent,
+.badge-tiers-partenaire,
+.badge-tiers-autre {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.badge-tiers-fournisseur { background: #FEF3C7; color: #B45309; }
+.badge-tiers-client      { background: #DCFCE7; color: #15803D; }
+.badge-tiers-agent       { background: #DBEAFE; color: #1D4ED8; }
+.badge-tiers-partenaire  { background: #EDE9FE; color: #6D28D9; }
+.badge-tiers-autre       { background: #E5E7EB; color: #374151; }
+
+/* Compte collectif */
+.badge-compte {
+    display: inline-block;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-family: 'Courier New', monospace;
+    font-size: 11.5px;
+    font-weight: 700;
+    padding: 3px 9px;
+    border-radius: 6px;
+}
+
+.compte-libelle {
+    color: #6B7280;
+    font-size: 12px;
+    margin-left: 4px;
+}
+
+.tiers-email,
+.tiers-tel {
+    color: #4B5563;
+    font-size: 12.5px;
+}
+
+.badge-active-ok {
+    display: inline-block;
+    background: #DCFCE7;
+    color: #16A34A;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.badge-active-off {
+    display: inline-block;
+    background: #F3F4F6;
+    color: #9CA3AF;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.badge-empty {
+    color: #D1D5DB;
+    font-size: 13px;
+}
+
+.row-inactive {
+    opacity: 0.7;
+}
+
+/* Dark mode */
+body.dark-mode .tiers-nom { color: #F8FAFC; }
+body.dark-mode .badge-tiers-fournisseur { background: rgba(245, 158, 11, 0.20); color: #FBBF24; }
+body.dark-mode .badge-tiers-client      { background: rgba(34, 197, 94, 0.20); color: #4ADE80; }
+body.dark-mode .badge-tiers-agent       { background: rgba(59, 130, 246, 0.20); color: #60A5FA; }
+body.dark-mode .badge-tiers-partenaire  { background: rgba(139, 92, 246, 0.20); color: #A78BFA; }
+body.dark-mode .badge-tiers-autre       { background: #334155; color: #CBD5E1; }
+body.dark-mode .badge-compte            { background: #172033; color: #94A3B8; }
+body.dark-mode .compte-libelle          { color: #94A3B8; }
+body.dark-mode .tiers-email,
+body.dark-mode .tiers-tel               { color: #CBD5E1; }
+body.dark-mode .badge-active-ok         { background: rgba(34, 197, 94, 0.20); color: #4ADE80; }
+body.dark-mode .badge-active-off        { background: #1A2437; color: #64748B; }

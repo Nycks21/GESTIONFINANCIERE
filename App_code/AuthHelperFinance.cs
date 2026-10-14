@@ -20,10 +20,8 @@ public static class AuthHelperFinance
   {
     new AuthHelper.MenuItem { Code = "accueil",   Text = "menu.accueil",   Url = "/pages/accueil/index.aspx",                         Icon = "fas fa-chalkboard",       Section = "section.accueil",      Order = 1  },
     new AuthHelper.MenuItem { Code = "accueilc",  Text = "menu.accueilc",  Url = "/pages/finance/accueil/index.aspx",                 Icon = "fas fa-save",       Section = "section.applications", Order = 2  },
-    new AuthHelper.MenuItem { Code = "sites",     Text = "menu.sites",     Url = "/pages/finance/parametrage/sites/sites.aspx",       Icon = "fas fa-map-marker-alt",   Section = "section.parametres",   Order = 3  },
-    new AuthHelper.MenuItem { Code = "monnaies",  Text = "menu.monnaies",  Url = "/pages/finance/parametrage/monnaies/monnaies.aspx", Icon = "fas fa-money-bill-wave",  Section = "section.parametres",   Order = 4  },
-    new AuthHelper.MenuItem { Code = "taux",      Text = "menu.taux",      Url = "/pages/finance/parametrage/taux/taux.aspx",         Icon = "fas fa-exchange-alt",   Section = "section.parametres",   Order = 5  },
-    new AuthHelper.MenuItem { Code = "exercices",      Text = "menu.exercices",      Url = "/pages/finance/parametrage/exercices/exercices.aspx",         Icon = "fas fa-calendar-alt",   Section = "section.parametres",   Order = 6  },
+    new AuthHelper.MenuItem { Code = "generale",      Text = "menu.generale",      Url = "/pages/finance/generale/generale.aspx",         Icon = "fas fa-cog",   Section = "section.parametres",   Order = 3  },
+    new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-cog",   Section = "section.parametres",   Order = 4  },
 
   };
 
@@ -34,6 +32,7 @@ public static class AuthHelperFinance
     { "sites",    "permSites"      },
     { "monnaies", "permMonnaies"   },
     { "taux",     "permTaux"       },
+    { "saisie",   "permSaisie"     },
   };
 
   private static readonly Dictionary<string, string> SectionIcons = new Dictionary<string, string>
@@ -50,6 +49,8 @@ public static class AuthHelperFinance
     { "sites",    "🚩" },
     { "monnaies", "💰" },
     { "taux",     "💱" },
+    { "exercices", "📚" },
+    { "saisie",   "📝" },
   };
 
   public static string GetCheckboxId(string menuCode)

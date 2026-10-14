@@ -2,12 +2,15 @@
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
+using System.Text.RegularExpressions;
 using System.Web;
 using System.Web.Script.Serialization;
 using System.Web.SessionState;
 
 public class SiteEdit : IHttpHandler, IRequiresSessionState
 {
+    private static readonly Regex CodeRegex = new Regex(@"^[0-9]{2}$", RegexOptions.Compiled);
+
     public void ProcessRequest(HttpContext ctx)
     {
         ctx.Response.ContentType = "application/json";
@@ -39,19 +42,30 @@ public class SiteEdit : IHttpHandler, IRequiresSessionState
                 return;
             }
 
-            string id = GetString(data, "id");
-            string nom = (GetString(data, "nom") ?? "").Trim();
+            string id          = GetString(data, "id");
+            string code        = (GetString(data, "code") ?? "").Trim();
+            string nom         = (GetString(data, "nom") ?? "").Trim();
             string description = (GetString(data, "description") ?? "").Trim();
-            bool enCours = GetBool(data, "enCours", false);
-            bool actif = GetBool(data, "actif", true);
+            bool   enCours     = GetBool(data, "enCours", false);
+            bool   actif       = GetBool(data, "actif", true);
 
-            if (string.IsNullOrEmpty(id) || string.IsNullOrWhiteSpace(nom))
+            if (string.IsNullOrEmpty(id))
             {
-                ctx.Response.Write("{\"success\":false,\"message\":\"ID et nom sont obligatoires.\"}");
+                ctx.Response.Write("{\"success\":false,\"message\":\"ID obligatoire.\"}");
+                return;
+            }
+            if (string.IsNullOrEmpty(code) || !CodeRegex.IsMatch(code))
+            {
+                ctx.Response.Write("{\"success\":false,\"message\":\"Le code doit contenir exactement 2 chiffres (de 00 à 99).\"}");
+                return;
+            }
+            if (string.IsNullOrWhiteSpace(nom))
+            {
+                ctx.Response.Write("{\"success\":false,\"message\":\"Le nom est obligatoire.\"}");
                 return;
             }
 
-            int userId = AuthHelper.GetUserId(ctx);
+            int    userId  = AuthHelper.GetUserId(ctx);
             string connStr = AuthHelper.ConnectionString;
 
             using (var conn = new SqlConnection(connStr))
@@ -70,7 +84,17 @@ public class SiteEdit : IHttpHandler, IRequiresSessionState
                                 throw new Exception("Site introuvable ou déjà supprimé.");
                         }
 
-                        // 2) Si EN_COURS = 1 → clear des AUTRES
+                        // 2) Anti-doublon sur CODE (hors soi-même)
+                        using (var cmdDup = new SqlCommand(
+                            "SELECT COUNT(1) FROM FSITE WHERE CODE = @code AND ID <> @id", conn, tx))
+                        {
+                            cmdDup.Parameters.AddWithValue("@code", code);
+                            cmdDup.Parameters.AddWithValue("@id", id);
+                            if (Convert.ToInt32(cmdDup.ExecuteScalar()) > 0)
+                                throw new Exception("Le code « " + code + " » est déjà utilisé par un autre site.");
+                        }
+
+                        // 3) Si EN_COURS = 1 → clear des AUTRES
                         if (enCours)
                         {
                             using (var cmdClear = new SqlCommand(@"
@@ -88,10 +112,11 @@ public class SiteEdit : IHttpHandler, IRequiresSessionState
                             }
                         }
 
-                        // 3) Update
+                        // 4) Update (CODE inclus)
                         string sql = @"
                             UPDATE FSITE
-                            SET NOM = @nom,
+                            SET CODE = @code,
+                                NOM = @nom,
                                 DESCRIPTION = @description,
                                 EN_COURS = @enCours,
                                 ACTIVE = @active,
@@ -102,6 +127,7 @@ public class SiteEdit : IHttpHandler, IRequiresSessionState
                         using (var cmd = new SqlCommand(sql, conn, tx))
                         {
                             cmd.Parameters.AddWithValue("@id", id);
+                            cmd.Parameters.AddWithValue("@code", code);
                             cmd.Parameters.AddWithValue("@nom", nom);
                             cmd.Parameters.AddWithValue("@description",
                                 string.IsNullOrEmpty(description) ? (object)DBNull.Value : description);

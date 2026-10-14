@@ -89,6 +89,9 @@
                       <span data-i18n="sites.list_title"></span>
                     </span>
                     <div class="action-buttons">
+                      <a href="../../generale/generale.aspx" class="btn btn-secondary btn-sm">
+                        <i class="fas fa-arrow-left"></i> <span data-i18n="button.back"></span>
+                      </a>
                       <button class="btn btn-success btn-sm" onclick="openAddSiteModal(event)" type="button">
                         <i class="fas fa-plus"></i> <span data-i18n="sites.btn.add"></span>
                       </button>

@@ -1,0 +1,673 @@
+/* ═══════════════════════════════════════════════════════════
+   Module JOURNAUX — Styles spécifiques
+   ═══════════════════════════════════════════════════════════ */
+
+/* ───────────────────────────────────────────────────────────
+   1. BASE
+   ─────────────────────────────────────────────────────────── */
+.journal-libelle {
+    font-weight: 600;
+    color: #1F2937;
+}
+
+.row-inactive {
+    opacity: 0.7;
+}
+
+.badge-empty {
+    color: #D1D5DB;
+    font-size: 13px;
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   2. BADGES — CODE
+   ─────────────────────────────────────────────────────────── */
+.badge-code {
+    display: inline-block;
+    background: linear-gradient(135deg, #007bff, #0056b3);
+    color: #fff !important;
+    font-weight: 700;
+    font-size: 12px;
+    letter-spacing: 0.5px;
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   3. BADGES — TYPE JOURNAL (6 variantes)
+   ─────────────────────────────────────────────────────────── */
+.badge-type-achats,
+.badge-type-ventes,
+.badge-type-banque,
+.badge-type-caisse,
+.badge-type-operations-diverses,
+.badge-type-general {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 11px;
+    border-radius: 12px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+}
+
+.badge-type-achats {
+    background: #FEF3C7;
+    color: #B45309;
+}
+
+.badge-type-ventes {
+    background: #DCFCE7;
+    color: #15803D;
+}
+
+.badge-type-banque {
+    background: #DBEAFE;
+    color: #1D4ED8;
+}
+
+.badge-type-caisse {
+    background: #FCE7F3;
+    color: #BE185D;
+}
+
+.badge-type-operations-diverses {
+    background: #EDE9FE;
+    color: #6D28D9;
+}
+
+.badge-type-general {
+    background: #E5E7EB;
+    color: #374151;
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   4. AUTRES BADGES (monnaie, site, statut)
+   ─────────────────────────────────────────────────────────── */
+.badge-monnaie {
+    display: inline-block;
+    background: #F0FDF4;
+    color: #15803D;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 3px 9px;
+    border-radius: 12px;
+    border: 1px solid #BBF7D0;
+    font-family: 'Courier New', monospace;
+}
+
+/* ✅ badge-site : UNE seule définition (fusionné) */
+.badge-site {
+    display: inline-block;
+    background: #F3F4F6;
+    color: #4B5563;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+}
+
+.badge-site-more {
+    display: inline-block;
+    background: #DBEAFE;
+    color: #1D4ED8;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    cursor: help;
+}
+
+.prefix-code {
+    display: inline-block;
+    background: #F9FAFB;
+    border: 1px solid #E5E7EB;
+    color: #4B5563;
+    font-size: 11.5px;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-family: 'Courier New', monospace;
+}
+
+.badge-active-ok {
+    display: inline-block;
+    background: #DCFCE7;
+    color: #16A34A;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+.badge-active-off {
+    display: inline-block;
+    background: #F3F4F6;
+    color: #9CA3AF;
+    font-weight: 700;
+    font-size: 11px;
+    padding: 4px 12px;
+    border-radius: 20px;
+}
+
+
+/* ───────────────────────────────────────────────────────────
+   5. BADGES SITES (tableau — plusieurs badges)
+   ─────────────────────────────────────────────────────────── */
+.sites-badges {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   6. MULTI-SELECT SITES (version inline — checkboxes visibles)
+   ═══════════════════════════════════════════════════════════ */
+
+/* Conteneur principal */
+.multiselect-sites {
+    border: 1px solid #E5E7EB;
+    border-radius: 8px;
+    background: #fff;
+    overflow: hidden;
+}
+
+/* En-tête : titre + actions (Tout / Aucun) */
+.multiselect-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 12px;
+    background: #F9FAFB;
+    border-bottom: 1px solid #E5E7EB;
+    font-size: 12.5px;
+}
+
+.multiselect-title {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 700;
+    color: #4B5563;
+}
+
+.multiselect-title i {
+    color: #2563EB;
+}
+
+.multiselect-count {
+    background: #2563EB;
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 1px 7px;
+    border-radius: 10px;
+    min-width: 20px;
+    text-align: center;
+}
+
+.multiselect-actions {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11.5px;
+}
+
+.multiselect-action {
+    background: none;
+    border: none;
+    color: #2563EB;
+    font-weight: 600;
+    cursor: pointer;
+    padding: 0;
+    font-family: inherit;
+}
+
+.multiselect-action:hover {
+    text-decoration: underline;
+}
+
+.multiselect-sep {
+    color: #D1D5DB;
+}
+
+/* Barre de recherche */
+.multiselect-search {
+    position: relative;
+    padding: 8px 12px;
+    border-bottom: 1px solid #E5E7EB;
+}
+
+.multiselect-search i {
+    position: absolute;
+    left: 22px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: #9CA3AF;
+    font-size: 12px;
+    pointer-events: none;
+}
+
+.multiselect-search input {
+    padding-left: 32px;
+    font-size: 12.5px;
+    min-height: 34px;
+}
+
+/* Liste scrollable — 3 sites visibles puis scroll */
+.multiselect-list {
+    /* ✅ 3 × 40px = 120px (hauteur d'un .multiselect-item) */
+    max-height: 120px;
+    overflow-y: auto;
+    overflow-x: hidden;
+    scrollbar-width: thin;
+    scrollbar-color: #CBD5E1 #F1F5F9;
+    /* ✅ Plus de border-top ici : la .multiselect-search a déjà border-bottom */
+}
+
+/* Scrollbar WebKit */
+.multiselect-list::-webkit-scrollbar {
+    width: 8px;
+}
+
+.multiselect-list::-webkit-scrollbar-track {
+    background: #F1F5F9;
+    border-radius: 4px;
+}
+
+.multiselect-list::-webkit-scrollbar-thumb {
+    background: #CBD5E1;
+    border-radius: 4px;
+}
+
+.multiselect-list::-webkit-scrollbar-thumb:hover {
+    background: #94A3B8;
+}
+
+/* Item (une ligne = un site) */
+.multiselect-item {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px;
+    height: 40px;
+    box-sizing: border-box;
+    cursor: pointer;
+    font-size: 13px;
+    border-bottom: 1px solid #F3F4F6;
+    transition: background 0.1s;
+}
+
+.multiselect-item:last-child {
+    border-bottom: none;
+}
+
+.multiselect-item:hover {
+    background: #F9FAFB;
+}
+
+.multiselect-item.is-checked {
+    background: #EFF6FF;
+}
+
+.multiselect-item input[type="checkbox"] {
+    width: 16px;
+    height: 16px;
+    accent-color: #2563EB;
+    cursor: pointer;
+    flex-shrink: 0;
+}
+
+.multiselect-code {
+    display: inline-block;
+    background: #E5E7EB;
+    color: #4B5563;
+    font-family: 'Courier New', monospace;
+    font-size: 11px;
+    font-weight: 700;
+    padding: 2px 7px;
+    border-radius: 4px;
+    min-width: 90px;
+}
+
+.multiselect-item.is-checked .multiselect-code {
+    background: #DBEAFE;
+    color: #1D4ED8;
+}
+
+.multiselect-name {
+    flex: 1;
+    color: #1F2937;
+}
+
+/* État vide */
+.multiselect-empty {
+    padding: 20px;
+    text-align: center;
+    color: #9CA3AF;
+    font-size: 12.5px;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   7. DARK MODE
+   ═══════════════════════════════════════════════════════════ */
+
+/* Base */
+body.dark-mode .journal-libelle {
+    color: #F8FAFC;
+}
+
+/* Badges type */
+body.dark-mode .badge-type-achats {
+    background: rgba(245, 158, 11, 0.20);
+    color: #FBBF24;
+}
+
+body.dark-mode .badge-type-ventes {
+    background: rgba(34, 197, 94, 0.20);
+    color: #4ADE80;
+}
+
+body.dark-mode .badge-type-banque {
+    background: rgba(59, 130, 246, 0.20);
+    color: #60A5FA;
+}
+
+body.dark-mode .badge-type-caisse {
+    background: rgba(236, 72, 153, 0.20);
+    color: #F472B6;
+}
+
+body.dark-mode .badge-type-operations-diverses {
+    background: rgba(139, 92, 246, 0.20);
+    color: #A78BFA;
+}
+
+body.dark-mode .badge-type-general {
+    background: #334155;
+    color: #CBD5E1;
+}
+
+/* Autres badges */
+body.dark-mode .badge-monnaie {
+    background: rgba(34, 197, 94, 0.15);
+    color: #4ADE80;
+    border-color: rgba(34, 197, 94, 0.35);
+}
+
+body.dark-mode .badge-site {
+    background: #334155;
+    color: #CBD5E1;
+}
+
+body.dark-mode .badge-site-more {
+    background: rgba(96, 165, 250, 0.20);
+    color: #93C5FD;
+}
+
+body.dark-mode .prefix-code {
+    background: #172033;
+    border-color: #334155;
+    color: #94A3B8;
+}
+
+body.dark-mode .badge-active-ok {
+    background: rgba(34, 197, 94, 0.20);
+    color: #4ADE80;
+}
+
+body.dark-mode .badge-active-off {
+    background: #1A2437;
+    color: #64748B;
+}
+
+/* Multi-select */
+body.dark-mode .multiselect-sites {
+    background: #1E293B;
+    border-color: #334155;
+}
+
+body.dark-mode .multiselect-header {
+    background: #172033;
+    border-bottom-color: #334155;
+    color: #CBD5E1;
+}
+
+body.dark-mode .multiselect-search {
+    border-bottom-color: #334155;
+}
+
+/* ✅ Icône recherche en dark mode (manquait) */
+body.dark-mode .multiselect-search i {
+    color: #64748B;
+}
+
+body.dark-mode .multiselect-search input {
+    background: #172033;
+    color: #F8FAFC;
+    border-color: #334155;
+}
+
+body.dark-mode .multiselect-item {
+    color: #CBD5E1;
+    border-bottom-color: #1E293B;
+}
+
+body.dark-mode .multiselect-item:hover {
+    background: #293850;
+}
+
+body.dark-mode .multiselect-item.is-checked {
+    background: rgba(96, 165, 250, 0.12);
+}
+
+body.dark-mode .multiselect-code {
+    background: #172033;
+    color: #94A3B8;
+}
+
+body.dark-mode .multiselect-item.is-checked .multiselect-code {
+    background: rgba(96, 165, 250, 0.20);
+    color: #93C5FD;
+}
+
+body.dark-mode .multiselect-name {
+    color: #E2E8F0;
+}
+
+/* ✅ Scrollbar dark mode : UNE seule définition (fusionné) */
+body.dark-mode .multiselect-list {
+    scrollbar-color: #475569 #0F172A;
+}
+
+body.dark-mode .multiselect-list::-webkit-scrollbar-track {
+    background: #0F172A;
+}
+
+body.dark-mode .multiselect-list::-webkit-scrollbar-thumb {
+    background: #475569;
+}
+
+body.dark-mode .multiselect-list::-webkit-scrollbar-thumb:hover {
+    background: #64748B;
+}
+
+/* ✅ Séparateur "·" en dark mode (manquait) */
+body.dark-mode .multiselect-sep {
+    color: #475569;
+}
+
+
+/* ═══════════════════════════════════════════════════════════
+   8. RESPONSIVE
+   ═══════════════════════════════════════════════════════════ */
+@media (max-width: 768px) {
+    .multiselect-list {
+        max-height: 132px;   /* 3 × 44px */
+    }
+
+    .multiselect-item {
+        height: 44px;        /* plus haut pour le tactile */
+        padding: 10px 12px;
+    }
+}
+
+.badge-plan {
+    display: inline-block;
+    background: linear-gradient(135deg, #F59E0B, #D97706);
+    color: #fff;
+    font-size: 10.5px;
+    font-weight: 700;
+    padding: 3px 8px;
+    border-radius: 6px;
+    font-family: 'Courier New', monospace;
+    letter-spacing: 0.3px;
+}
+body.dark-mode .badge-plan {
+    background: linear-gradient(135deg, #D97706, #B45309);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   CATÉGORIE JOURNAL — Radios + badges
+   ═══════════════════════════════════════════════════════════ */
+
+/* ─── Radios ─── */
+.categorie-radio-group {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+}
+
+.categorie-radio {
+    cursor: pointer;
+    margin: 0;
+}
+
+.categorie-radio input[type="radio"] {
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+}
+
+.categorie-radio-content {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px;
+    border: 2px solid #E5E7EB;
+    border-radius: 10px;
+    background: #FFFFFF;
+    transition: all 0.15s ease;
+    text-align: center;
+    min-height: 80px;
+}
+
+.categorie-radio-content i {
+    font-size: 20px;
+    color: #9CA3AF;
+    transition: color 0.15s ease;
+}
+
+.categorie-radio-title {
+    font-weight: 700;
+    font-size: 13px;
+    color: #4B5563;
+    transition: color 0.15s ease;
+}
+
+.categorie-radio-hint {
+    font-size: 10.5px;
+    color: #9CA3AF;
+    line-height: 1.2;
+}
+
+.categorie-radio input[type="radio"]:checked + .categorie-radio-content {
+    border-color: #2563EB;
+    background: linear-gradient(135deg, #EFF6FF, #DBEAFE);
+    box-shadow: 0 3px 10px rgba(37, 99, 235, 0.15);
+}
+
+.categorie-radio input[type="radio"]:checked + .categorie-radio-content i {
+    color: #2563EB;
+}
+
+.categorie-radio input[type="radio"]:checked + .categorie-radio-content .categorie-radio-title {
+    color: #1E40AF;
+}
+
+.categorie-radio:hover .categorie-radio-content {
+    border-color: #9CA3AF;
+}
+
+/* ─── Badges dans le tableau ─── */
+.badge-cat-od,
+.badge-cat-tresorerie {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.3px;
+    text-transform: uppercase;
+    white-space: nowrap;
+}
+
+.badge-cat-od {
+    background: #F3F4F6;
+    color: #4B5563;
+}
+
+.badge-cat-tresorerie {
+    background: linear-gradient(135deg, #FEF3C7, #FDE68A);
+    color: #B45309;
+}
+
+.badge-cat-od i,
+.badge-cat-tresorerie i {
+    font-size: 10px;
+}
+
+/* ─── Dark mode ─── */
+body.dark-mode .categorie-radio-content {
+    background: #172033;
+    border-color: #334155;
+}
+
+body.dark-mode .categorie-radio-title {
+    color: #CBD5E1;
+}
+
+body.dark-mode .categorie-radio input[type="radio"]:checked + .categorie-radio-content {
+    background: rgba(96, 165, 250, 0.10);
+    border-color: #60A5FA;
+}
+
+body.dark-mode .categorie-radio input[type="radio"]:checked + .categorie-radio-content i,
+body.dark-mode .categorie-radio input[type="radio"]:checked + .categorie-radio-content .categorie-radio-title {
+    color: #93C5FD;
+}
+
+body.dark-mode .badge-cat-od {
+    background: #334155;
+    color: #CBD5E1;
+}
+
+body.dark-mode .badge-cat-tresorerie {
+    background: rgba(245, 158, 11, 0.20);
+    color: #FBBF24;
+}
+
+@media (max-width: 480px) {
+    .categorie-radio-group { grid-template-columns: 1fr; }
+}
