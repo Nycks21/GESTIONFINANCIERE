@@ -2031,6 +2031,10 @@
   "saisie.msg.no_lignes": "Tsy misy andalana.",
 
   "saisie.section.header": "Lohapeo ny écriture",
+  "saisie.section.identification": "Famantarana",
+  "saisie.section.dates": "Daty",
+  "saisie.section.currency": "Vola sy sandam-bola",
+  "saisie.section.reference_status": "Laharana sy sata",
   "saisie.section.line": "Antsipiriany ny andalana",
   "saisie.section.totals": "Fitambarana",
   "saisie.section.lines": "Andalana écriture",
@@ -2096,5 +2100,8 @@
   "saisie.msg.cannot_save": "Tsy afaka mitahiry",
   "saisie.msg.save_disabled": "Tsy mandeha na tsy feno ny écriture",
   "saisie.col.debit_rap": "Trosa rap.",
-  "saisie.col.credit_rap": "Tahiry rap."
+  "saisie.col.credit_rap": "Tahiry rap.",
+  "saisie.col.ref.facture": "Laharan'ny faktiora",
+  "saisie.col.date.facture": "Datin'ny faktiora",
+  "saisie.col.marche": "Kaody tsenam-barotra"
 }

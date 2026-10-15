@@ -32,11 +32,12 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
             {
                 conn.Open();
 
-                // ─── EN-TÊTE FECRITURE ───
+                // ─── EN-TÊTE FECRITURE (avec REFERENCE_FACTURE + DATE_FACTURE) ───
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, SITE_ID, MONNAIE_ID,
-                           NUMERO, DATE_COMPTABLE, DATE_PIECE, REFERENCE, LIBELLE,
-                           TOTAL_DEBIT, TOTAL_CREDIT, STATUT
+                           NUMERO, DATE_COMPTABLE, DATE_PIECE,
+                           REFERENCE, REFERENCE_FACTURE, DATE_FACTURE,
+                           LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT
                     FROM FECRITURE WHERE ID = @id", conn))
                 {
                     cmd.Parameters.AddWithValue("@id", id);
@@ -55,6 +56,10 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                             ecriture["DATE_COMPTABLE"]  = Convert.ToDateTime(r["DATE_COMPTABLE"]).ToString("yyyy-MM-dd");
                             ecriture["DATE_PIECE"]      = r["DATE_PIECE"] == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_PIECE"]).ToString("yyyy-MM-dd");
                             ecriture["REFERENCE"]       = r["REFERENCE"] == DBNull.Value ? "" : r["REFERENCE"].ToString();
+                            // ⭐ NOUVELLES COLONNES
+                            ecriture["REFERENCE_FACTURE"] = r["REFERENCE_FACTURE"] == DBNull.Value ? "" : r["REFERENCE_FACTURE"].ToString();
+                            ecriture["DATE_FACTURE"]      = r["DATE_FACTURE"] == DBNull.Value
+                                                            ? "" : Convert.ToDateTime(r["DATE_FACTURE"]).ToString("yyyy-MM-dd");
                             ecriture["LIBELLE"]         = r["LIBELLE"].ToString();
                             ecriture["TOTAL_DEBIT"]     = r["TOTAL_DEBIT"]  == DBNull.Value ? 0m : Convert.ToDecimal(r["TOTAL_DEBIT"]);
                             ecriture["TOTAL_CREDIT"]    = r["TOTAL_CREDIT"] == DBNull.Value ? 0m : Convert.ToDecimal(r["TOTAL_CREDIT"]);
@@ -67,8 +72,6 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                 { ctx.Response.Write("{\"success\":false,\"message\":\"Écriture introuvable.\"}"); return; }
 
                 // ─── LIGNES FECRITURE_LIGNE ───
-                //   ⭐ Lecture de SENS + MONTANT → restitution aussi en DEBIT/CREDIT
-                //      pour compatibilité totale avec le frontend existant.
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT ID, ORDRE, COMPTE_ID, COMPTE_PLAN_ORDER, TIERS_ID, AUXILIAIRE,
                            LIBELLE, SENS, MONTANT, MONTANT_DEVISE, COURS_DEVISE,
@@ -94,14 +97,13 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                             l["AUXILIAIRE"]            = r["AUXILIAIRE"] == DBNull.Value ? "" : r["AUXILIAIRE"].ToString();
                             l["LIBELLE"]               = r["LIBELLE"] == DBNull.Value ? "" : r["LIBELLE"].ToString();
 
-                            // ⭐ SENS + MONTANT (nouveaux champs)
                             string sens = r["SENS"] == DBNull.Value ? null : r["SENS"].ToString();
                             decimal? montant = r["MONTANT"] == DBNull.Value ? (decimal?)null : Convert.ToDecimal(r["MONTANT"]);
 
                             l["SENS"]    = sens;
                             l["MONTANT"] = montant;
 
-                            // ─── Compatibilité : DEBIT / CREDIT calculés ───
+                            // Compatibilité DEBIT / CREDIT
                             l["DEBIT"]  = (sens == "D" && montant.HasValue) ? (object)montant.Value : 0m;
                             l["CREDIT"] = (sens == "C" && montant.HasValue) ? (object)montant.Value : 0m;
 

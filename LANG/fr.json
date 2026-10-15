@@ -2055,6 +2055,10 @@
 
   "saisie.msg.no_lignes": "Aucune ligne.",
   "saisie.section.header": "En-tête de l'écriture",
+  "saisie.section.identification": "Identification",
+  "saisie.section.dates": "Dates",
+  "saisie.section.currency": "Devise et conversion",
+  "saisie.section.reference_status": "Référence et statut",
   "saisie.section.line": "Détail de la ligne",
   "saisie.section.totals": "Totaux",
   "saisie.section.lines": "Lignes de l'écriture",
@@ -2123,5 +2127,8 @@
   "saisie.msg.cannot_save": "Impossible d'enregistrer",
   "saisie.msg.save_disabled": "Écriture déséquilibrée ou incomplète",
   "saisie.col.debit_rap": "Débit rapport",
-  "saisie.col.credit_rap": "Crédit rapport"
+  "saisie.col.credit_rap": "Crédit rapport",
+  "saisie.col.ref.facture": "N° facture",
+  "saisie.col.date.facture": "Date facture",
+  "saisie.col.marche": "Code Marché"
 }

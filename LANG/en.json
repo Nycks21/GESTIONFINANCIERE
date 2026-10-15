@@ -2053,6 +2053,10 @@
 
   "saisie.msg.no_lignes": "No line.",
   "saisie.section.header": "Entry header",
+  "saisie.section.identification": "Identification",
+  "saisie.section.dates": "Dates",
+  "saisie.section.currency": "Currency and exchange rate",
+  "saisie.section.reference_status": "Reference and status",
   "saisie.section.line": "Line details",
   "saisie.section.totals": "Totals",
   "saisie.section.lines": "Entry lines",
@@ -2118,5 +2122,8 @@
   "saisie.msg.cannot_save": "Cannot save",
   "saisie.msg.save_disabled": "Unbalanced or incomplete entry",
   "saisie.col.debit_rap": "Recon. debit",
-  "saisie.col.credit_rap": "Recon. credit"
+  "saisie.col.credit_rap": "Recon. credit",
+  "saisie.col.ref.facture": "Invoice Number",
+  "saisie.col.date.facture": "Invoice Date",
+  "saisie.col.marche": "Market Code"
 }

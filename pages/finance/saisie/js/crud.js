@@ -32,7 +32,6 @@ function confirmLeaveEdit() {
     );
 }
 
-// Avertissement avant fermeture du navigateur
 window.addEventListener('beforeunload', function (e) {
     if (hasUnsavedChanges()) {
         e.preventDefault();
@@ -50,14 +49,12 @@ window.addEventListener('beforeunload', function (e) {
 function _serverLigneToClient(l) {
     var ordreToKey = buildOrdreToKeyMap();
 
-    // Nouveau format : SENS + MONTANT (fallback DEBIT/CREDIT pour rétro-compat)
     var sens    = l.SENS  || null;
     var montant = parseFloat(l.MONTANT || 0);
 
     var debit  = (sens === 'D') ? montant : (parseFloat(l.DEBIT  || 0) || 0);
     var credit = (sens === 'C') ? montant : (parseFloat(l.CREDIT || 0) || 0);
 
-    // Fallback si pas de SENS/MONTANT : lit DEBIT/CREDIT
     if (!sens) {
         debit  = parseFloat(l.DEBIT  || 0);
         credit = parseFloat(l.CREDIT || 0);
@@ -116,7 +113,7 @@ function _clientLigneToPayload(l) {
 }
 
 // ============================================================
-// HELPER — SITE PAR DÉFAUT (celui en cours)
+// HELPER — SITE PAR DÉFAUT
 // ============================================================
 function _getDefaultSiteId() {
     var sites = AppState.sites || [];
@@ -142,11 +139,13 @@ function newEcriture() {
     _setVal('ecrDate', new Date().toISOString().slice(0, 10));
     _setVal('ecrDatePiece', '');
     _setVal('ecrReference', '');
+    // ⭐ NOUVEAUX CHAMPS
+    _setVal('ecrReferenceFacture', '');
+    _setVal('ecrDateFacture', '');
     _setVal('ecrLibelle', '');
     _setVal('ecrStatut', 'BROUILLON');
     _setVal('ecrCours', '1');
 
-    // Pré-sélection du site par défaut
     var defaultSiteId = _getDefaultSiteId();
     if (defaultSiteId) _setVal('ecrSite', defaultSiteId);
 
@@ -164,10 +163,8 @@ function newEcriture() {
     computeTotaux();
     switchTab('edit');
 
-    // MAJ état du bouton Enregistrer
     if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
 
-    // ⭐ Nouvelle écriture = propre (aucune modif non enregistrée)
     markClean();
 }
 
@@ -195,7 +192,6 @@ function clearEcriture() {
 // CHARGER UNE ÉCRITURE POUR ÉDITION
 // ============================================================
 async function editEcriture(id) {
-    // ⭐ Confirmation si modifications non enregistrées en cours
     if (hasUnsavedChanges()) {
         if (!confirmLeaveEdit()) return;
     }
@@ -221,6 +217,9 @@ async function editEcriture(id) {
         _setVal('ecrDate', ecr.DATE_COMPTABLE);
         _setVal('ecrDatePiece', ecr.DATE_PIECE || '');
         _setVal('ecrReference', ecr.REFERENCE || '');
+        // ⭐ NOUVEAUX CHAMPS
+        _setVal('ecrReferenceFacture', ecr.REFERENCE_FACTURE || '');
+        _setVal('ecrDateFacture',      ecr.DATE_FACTURE      || '');
         _setVal('ecrLibelle', ecr.LIBELLE);
         _setVal('ecrStatut', ecr.STATUT);
 
@@ -229,7 +228,6 @@ async function editEcriture(id) {
 
         await loadAllComptesActifs();
 
-        // Conversion serveur → client (dynamique)
         data.lignes.forEach(function (l) {
             var client = _serverLigneToClient(l);
 
@@ -246,12 +244,10 @@ async function editEcriture(id) {
         renderGrid();
         computeTotaux();
 
-        // MAJ état du bouton Enregistrer après chargement
         if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
 
         switchTab('edit');
 
-        // ⭐ Écriture chargée = propre
         markClean();
     } catch (err) {
         showErrorToast(err.message);
@@ -266,7 +262,6 @@ async function editEcriture(id) {
 async function saveEcriture(e) {
     if (e) e.preventDefault();
 
-    // ⭐ Protection anti double-clic
     var btnSave = document.getElementById('btnSaveEcriture');
     if (btnSave && btnSave.disabled) {
         showToast(
@@ -277,7 +272,6 @@ async function saveEcriture(e) {
         return;
     }
 
-    // ⭐ Validation complète (inclut équilibre MONTANT + MONTANT_DEVISE)
     var validation = validateEcriture();
     if (!validation.valid) {
         Swal.fire({
@@ -318,23 +312,26 @@ async function saveEcriture(e) {
 
     var siteId = _getVal('ecrSite') || _getDefaultSiteId() || null;
 
+    // ⭐ Payload avec REFERENCE_FACTURE + DATE_FACTURE
     var payload = {
-        id:            AppState.editingId,
-        siteId:        siteId,
-        exerciceId:    _getVal('ecrExercice'),
-        periodeId:     periodeId,
-        journalId:     _getVal('ecrJournal'),
-        monnaieId:     _getVal('ecrDevise'),
-        numero:        numeroFinal,
-        dateComptable: _getVal('ecrDate'),
-        datePiece:     _getVal('ecrDatePiece'),
-        reference:     _getVal('ecrReference').trim(),
-        libelle:       libelleFinal,
-        statut:        _getVal('ecrStatut'),
-        lignes:        lignesPayload
+        id:               AppState.editingId,
+        siteId:           siteId,
+        exerciceId:       _getVal('ecrExercice'),
+        periodeId:        periodeId,
+        journalId:        _getVal('ecrJournal'),
+        monnaieId:        _getVal('ecrDevise'),
+        numero:           numeroFinal,
+        dateComptable:    _getVal('ecrDate'),
+        datePiece:        _getVal('ecrDatePiece'),
+        reference:        _getVal('ecrReference').trim(),
+        // ⭐ NOUVEAUX CHAMPS
+        referenceFacture: _getVal('ecrReferenceFacture').trim(),
+        dateFacture:      _getVal('ecrDateFacture') || null,
+        libelle:          libelleFinal,
+        statut:           _getVal('ecrStatut'),
+        lignes:           lignesPayload
     };
 
-    // ⭐ Désactive le bouton pendant la sauvegarde (anti double-clic)
     if (btnSave) btnSave.disabled = true;
 
     try {
@@ -350,7 +347,6 @@ async function saveEcriture(e) {
         if (result.success) {
             showSuccessToast(result.message || _t('saisie.msg.save_ok') || 'Écriture enregistrée');
 
-            // ⭐ Marque comme propre AVANT de reset (évite le beforeunload)
             markClean();
 
             newEcriture();
@@ -363,7 +359,6 @@ async function saveEcriture(e) {
         showErrorToast(err.message);
     } finally {
         hideSpinner();
-        // Réactive le bouton selon l'état actuel
         if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
     }
 }
@@ -409,7 +404,6 @@ async function deleteEcriture(id) {
         if (result.success) {
             showSuccessToast(result.message || _t('saisie.msg.delete_ok') || 'Écriture supprimée');
 
-            // ⭐ Marque comme propre avant de reset
             markClean();
 
             AppState.editingId = null;

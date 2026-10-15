@@ -291,16 +291,38 @@ body.dark-mode {
 }
 
 /* ═══════════════ ENTÊTE ÉCRITURE ─────────────── */
-.eh-grid {
+.eh-sections {
     display: grid;
-    grid-template-columns: 1.3fr 1.6fr 0.8fr 1fr 1fr 0.8fr 0.8fr;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
     gap: 10px;
-    margin-bottom: 12px;
 }
 
-.eh-grid-2 {
+.eh-section {
+    min-width: 0;
+    padding: 12px;
+    background: var(--s-card);
+    border: 1px solid var(--s-border);
+    border-radius: var(--s-radius);
+}
+
+.eh-section-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    margin: 0 0 10px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--s-border);
+    color: var(--s-muted);
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.4px;
+    text-transform: uppercase;
+}
+
+.eh-section-title i { color: var(--s-primary); }
+
+.eh-section-fields {
     display: grid;
-    grid-template-columns: 2fr 1fr;
     gap: 10px;
 }
 
@@ -716,13 +738,12 @@ body.dark-mode {
 
 /* ═══════════════ RESPONSIVE ═══════════════ */
 @media (max-width: 992px) {
-    .eh-grid { grid-template-columns: 1fr 1fr; }
-    .eh-grid-2 { grid-template-columns: 1fr; }
+    .eh-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .ecr-bottom { grid-template-columns: 1fr; }
 }
 
 @media (max-width: 576px) {
-    .eh-grid { grid-template-columns: 1fr; }
+    .eh-sections { grid-template-columns: 1fr; }
     .ligne-actions { grid-template-columns: repeat(3, 1fr); }
     .toolbar-select { min-width: 100%; }
 }
@@ -733,6 +754,7 @@ body.dark-mode .saisie-toolbar,
 body.dark-mode .saisie-tabs,
 body.dark-mode .saisie-tab-panel,
 body.dark-mode .ecr-block,
+body.dark-mode .eh-section,
 body.dark-mode .list-toolbar,
 body.dark-mode .list-grid,
 body.dark-mode .ecr-grid-wrapper {
@@ -836,10 +858,6 @@ body.dark-mode .la-btn.la-save:disabled {
     background: rgba(37, 99, 235, 0.15);
 }
 
-/* Grilles harmonisées */
-.eh-grid-5 { grid-template-columns: 1.4fr 1.4fr 0.8fr 0.9fr 0.7fr; }
-.eh-grid-4 { grid-template-columns: 1fr 1fr 1.6fr 1fr; }
-
 .eb-form-row-2 { display: grid; grid-template-columns: 1.2fr 2fr; gap: 10px; }
 .eb-form-row-4 { display: grid; grid-template-columns: 1fr 1fr 1.2fr 1fr; gap: 10px; }
 .eb-field-wide { grid-column: auto; }
@@ -869,8 +887,10 @@ body.dark-mode .la-btn.la-save:disabled {
 body.saisie-compact .saisie-content { padding: 6px !important; }
 body.saisie-compact .ecr-block { padding: 8px 10px; margin-bottom: 8px; }
 body.saisie-compact .ecr-block-title { margin-bottom: 6px; padding-bottom: 4px; font-size: 11px; }
-body.saisie-compact .eh-grid,
+body.saisie-compact .eh-sections,
 body.saisie-compact .eb-form-row { gap: 6px; margin-bottom: 6px; }
+body.saisie-compact .eh-section { padding: 8px; }
+body.saisie-compact .eh-section-title { margin-bottom: 6px; padding-bottom: 4px; font-size: 10px; }
 body.saisie-compact .eh-field label,
 body.saisie-compact .eb-field label { font-size: 10px; }
 body.saisie-compact .eh-field .form-control,
@@ -905,18 +925,20 @@ input.form-control:focus {
 
 /* Responsive compact */
 @media (max-width: 992px) {
-    .eh-grid-5 { grid-template-columns: 1fr 1fr; }
-    .eh-grid-4 { grid-template-columns: 1fr 1fr; }
     .eb-form-row-2,
     .eb-form-row-4 { grid-template-columns: 1fr 1fr; }
 }
 
 @media (max-width: 576px) {
-    .eh-grid-5,
-    .eh-grid-4,
     .eb-form-row-2,
     .eb-form-row-4 { grid-template-columns: 1fr; }
 }
+
+@media (min-width: 993px) and (max-width: 1200px) {
+    .eh-sections { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+body.dark-mode .eh-section-title { border-bottom-color: var(--s-border); }
 
 /* Dark mode — dirty indicator */
 body.dark-mode .dirty-indicator {
@@ -1038,4 +1060,124 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
 /* Espacement entre boutons d'action dans la liste des écritures */
 #ecrituresBody .btn-sm + .btn-sm {
     margin-left: 6px;
+}
+
+/* ═══════════════ SÉLECTEUR EXERCICE DANS L'EN-TÊTE ═══════════════ */
+
+/* Conteneur h3 : force le non-dépassement et le centrage */
+.eh-section-title {
+    min-height: 28px;        /* ⭐ hauteur garantie */
+    flex-wrap: nowrap;       /* ⭐ empêche le retour ligne */
+    overflow: hidden;
+}
+
+/* Pill de l'exercice */
+.header-exercice {
+    display: inline-flex;              /* ⭐ inline + flex interne */
+    align-items: center;               /* ⭐ centre verticalement */
+    justify-content: center;           /* ⭐ centre horizontalement */
+    gap: 5px;
+    margin-left: auto;                 /* ⭐ pousse à droite */
+    padding: 3px 10px;
+    height: 24px;                      /* ⭐ hauteur fixe compacte */
+    max-height: 24px;
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.10),
+        rgba(37, 99, 235, 0.06));
+    border: 1px solid rgba(37, 99, 235, 0.25);
+    border-radius: 10px;
+    vertical-align: middle;
+    transition: all 0.15s ease;
+}
+
+.header-exercice:hover {
+    background: linear-gradient(135deg,
+        rgba(37, 99, 235, 0.18),
+        rgba(37, 99, 235, 0.10));
+    border-color: rgba(37, 99, 235, 0.40);
+    transform: translateY(-1px);
+}
+
+.header-exercice label {
+    font-size: 9.5px;
+    font-weight: 700;
+    color: var(--s-primary);
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+    margin: 0;
+    white-space: nowrap;
+    line-height: 1;
+}
+
+.header-exercice select {
+    height: 18px;
+    min-height: 18px !important;      /* ⭐ override form-control */
+    padding: 0 18px 0 4px;            /* place pour la flèche */
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--s-primary);
+    background: transparent;
+    border: none;
+    outline: none;
+    cursor: pointer;
+    line-height: 1;
+    min-width: 60px;
+
+    /* ⭐ Flèche custom (SVG inline) */
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%232563EB' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 4px center;
+    background-size: 8px;
+}
+
+.header-exercice select:focus {
+    outline: none;
+    box-shadow: none;
+}
+
+/* ─── Dark mode ─── */
+body.dark-mode .header-exercice {
+    background: linear-gradient(135deg,
+        rgba(96, 165, 250, 0.15),
+        rgba(96, 165, 250, 0.08));
+    border-color: rgba(96, 165, 250, 0.35);
+}
+
+body.dark-mode .header-exercice:hover {
+    background: linear-gradient(135deg,
+        rgba(96, 165, 250, 0.25),
+        rgba(96, 165, 250, 0.15));
+    border-color: rgba(96, 165, 250, 0.55);
+}
+
+body.dark-mode .header-exercice label,
+body.dark-mode .header-exercice select {
+    color: #93C5FD;
+}
+
+body.dark-mode .header-exercice select {
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2393C5FD' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+}
+
+body.dark-mode .header-exercice select option {
+    background: #1E293B;
+    color: #F1F5F9;
+}
+
+/* ─── Mode compact ─── */
+body.saisie-compact .header-exercice {
+    height: 20px;
+    max-height: 20px;
+    padding: 2px 8px;
+    border-radius: 5px;
+}
+
+body.saisie-compact .header-exercice label { font-size: 9px; }
+body.saisie-compact .header-exercice select {
+    font-size: 10.5px;
+    height: 16px;
+    min-height: 16px !important;
 }

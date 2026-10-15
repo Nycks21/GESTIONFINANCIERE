@@ -27,18 +27,21 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             var data = serializer.Deserialize<Dictionary<string, object>>(json);
             if (data == null) { ctx.Response.Write("{\"success\":false,\"message\":\"Corps invalide.\"}"); return; }
 
-            string id           = GetString(data, "id");
-            string exerciceId   = GetString(data, "exerciceId");
-            string periodeId    = GetString(data, "periodeId");
-            string journalId    = GetString(data, "journalId");
-            string monnaieId    = GetString(data, "monnaieId");
-            string siteId       = GetString(data, "siteId");
-            string numero       = (GetString(data, "numero") ?? "").Trim();
-            string dateCmp      = GetString(data, "dateComptable");
-            string datePiece    = GetString(data, "datePiece");
-            string reference    = (GetString(data, "reference") ?? "").Trim();
-            string libelle      = (GetString(data, "libelle") ?? "").Trim();
-            string statut       = (GetString(data, "statut") ?? "BROUILLON").Trim().ToUpperInvariant();
+            string id               = GetString(data, "id");
+            string exerciceId       = GetString(data, "exerciceId");
+            string periodeId        = GetString(data, "periodeId");
+            string journalId        = GetString(data, "journalId");
+            string monnaieId        = GetString(data, "monnaieId");
+            string siteId           = GetString(data, "siteId");
+            string numero           = (GetString(data, "numero") ?? "").Trim();
+            string dateCmp          = GetString(data, "dateComptable");
+            string datePiece        = GetString(data, "datePiece");
+            string reference        = (GetString(data, "reference") ?? "").Trim();
+            // ⭐ NOUVEAUX CHAMPS
+            string referenceFacture = (GetString(data, "referenceFacture") ?? "").Trim();
+            string dateFacture      = GetString(data, "dateFacture");
+            string libelle          = (GetString(data, "libelle") ?? "").Trim();
+            string statut           = (GetString(data, "statut") ?? "BROUILLON").Trim().ToUpperInvariant();
 
             Guid tmp;
             if (string.IsNullOrEmpty(exerciceId) || !Guid.TryParse(exerciceId, out tmp))
@@ -52,7 +55,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             if (string.IsNullOrEmpty(libelle))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Libellé obligatoire.\"}"); return; }
 
-            // SITE : optionnel, validation souple
             Guid siteGuid = Guid.Empty;
             bool hasSite = !string.IsNullOrEmpty(siteId) && Guid.TryParse(siteId, out siteGuid);
 
@@ -83,7 +85,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
 
                 decimal debit         = GetDecimal(l, "debit", 0);
                 decimal credit        = GetDecimal(l, "credit", 0);
-                decimal montantDevise = GetDecimal(l, "montantDevise", 0);   // ⭐ MONTANT_DEVISE
+                decimal montantDevise = GetDecimal(l, "montantDevise", 0);
 
                 if (debit < 0 || credit < 0 || (debit > 0 && credit > 0) || (debit == 0 && credit == 0))
                 { ctx.Response.Write("{\"success\":false,\"message\":\"Montant invalide sur une ligne.\"}"); return; }
@@ -91,11 +93,8 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 string sens = debit > 0 ? "D" : "C";
                 decimal montant = debit > 0 ? debit : credit;
 
-                // Tracking MONTANT
                 totalD += debit;
                 totalC += credit;
-
-                // Tracking MONTANT_DEVISE (dépend du sens)
                 if (sens == "D") totalDDevise += montantDevise;
                 else             totalCDevise += montantDevise;
 
@@ -110,7 +109,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 pl["LIBELLE"]         = GetString(l, "libelle");
                 pl["SENS"]            = sens;
                 pl["MONTANT"]         = montant;
-                pl["MONTANT_DEVISE"]  = montantDevise;                       // ⭐
+                pl["MONTANT_DEVISE"]  = montantDevise;
                 pl["SOURCE_FINANCEMENT"] = GetString(l, "sourceFinancement");
 
                 for (int k = 1; k <= 10; k++)
@@ -125,9 +124,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 parsedLignes.Add(pl);
             }
 
-            // ═══════════════════════════════════════════════════════
-            // VALIDATION DOUBLE ÉQUILIBRE
-            // ═══════════════════════════════════════════════════════
             if (totalD != totalC)
             {
                 ctx.Response.Write("{\"success\":false,\"message\":\"Écriture déséquilibrée (MONTANT) : Débit "
@@ -156,7 +152,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                         string periodeIdFinal = EnsurePeriodeFromExercice(
                             conn, tx, exerciceId, dtComptable, userId);
 
-                        // Vérif unicité numéro
                         using (var cmdChk = new SqlCommand(@"
                             SELECT COUNT(1) FROM FECRITURE
                             WHERE JOURNAL_ID = @j AND EXERCICE_ID = @e AND NUMERO = @n
@@ -183,11 +178,13 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                     throw new Exception("Écriture non modifiable (statut " + curStatut + ").");
                             }
 
+                            // ⭐ UPDATE avec REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 UPDATE FECRITURE
                                 SET EXERCICE_ID=@ex, PERIODE_ID=@pe, JOURNAL_ID=@j,
                                     SITE_ID=@site, MONNAIE_ID=@m,
-                                    NUMERO=@n, DATE_COMPTABLE=@dc, DATE_PIECE=@dp, REFERENCE=@ref,
+                                    NUMERO=@n, DATE_COMPTABLE=@dc, DATE_PIECE=@dp,
+                                    REFERENCE=@ref, REFERENCE_FACTURE=@refFact, DATE_FACTURE=@dateFact,
                                     LIBELLE=@lib, TOTAL_DEBIT=@td, TOTAL_CREDIT=@tc,
                                     STATUT=@st, UPDATED_BY=@u, UPDATED_AT=GETDATE()
                                 WHERE ID=@id", conn, tx))
@@ -202,6 +199,9 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
                                 cmd.Parameters.AddWithValue("@dp", string.IsNullOrEmpty(datePiece) ? (object)DBNull.Value : DateTime.Parse(datePiece));
                                 cmd.Parameters.AddWithValue("@ref", string.IsNullOrEmpty(reference) ? (object)DBNull.Value : reference);
+                                // ⭐ NOUVEAU
+                                cmd.Parameters.AddWithValue("@refFact", string.IsNullOrEmpty(referenceFacture) ? (object)DBNull.Value : referenceFacture);
+                                cmd.Parameters.AddWithValue("@dateFact", string.IsNullOrEmpty(dateFacture) ? (object)DBNull.Value : DateTime.Parse(dateFacture));
                                 cmd.Parameters.AddWithValue("@lib", libelle);
                                 cmd.Parameters.AddWithValue("@td", totalD);
                                 cmd.Parameters.AddWithValue("@tc", totalC);
@@ -219,15 +219,18 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                         }
                         else
                         {
+                            // ⭐ INSERT avec REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 INSERT INTO FECRITURE
                                     (ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, SITE_ID, MONNAIE_ID,
-                                     NUMERO, DATE_COMPTABLE, DATE_PIECE, REFERENCE, LIBELLE,
-                                     TOTAL_DEBIT, TOTAL_CREDIT, STATUT, CREATED_BY, CREATED_AT)
+                                     NUMERO, DATE_COMPTABLE, DATE_PIECE,
+                                     REFERENCE, REFERENCE_FACTURE, DATE_FACTURE,
+                                     LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT, CREATED_BY, CREATED_AT)
                                 VALUES
                                     (@id, @ex, @pe, @j, @site, @m,
-                                     @n, @dc, @dp, @ref, @lib,
-                                     @td, @tc, @st, @u, GETDATE())", conn, tx))
+                                     @n, @dc, @dp,
+                                     @ref, @refFact, @dateFact,
+                                     @lib, @td, @tc, @st, @u, GETDATE())", conn, tx))
                             {
                                 cmd.Parameters.AddWithValue("@id", finalId);
                                 cmd.Parameters.AddWithValue("@ex", exerciceId);
@@ -239,6 +242,9 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
                                 cmd.Parameters.AddWithValue("@dp", string.IsNullOrEmpty(datePiece) ? (object)DBNull.Value : DateTime.Parse(datePiece));
                                 cmd.Parameters.AddWithValue("@ref", string.IsNullOrEmpty(reference) ? (object)DBNull.Value : reference);
+                                // ⭐ NOUVEAU
+                                cmd.Parameters.AddWithValue("@refFact", string.IsNullOrEmpty(referenceFacture) ? (object)DBNull.Value : referenceFacture);
+                                cmd.Parameters.AddWithValue("@dateFact", string.IsNullOrEmpty(dateFacture) ? (object)DBNull.Value : DateTime.Parse(dateFacture));
                                 cmd.Parameters.AddWithValue("@lib", libelle);
                                 cmd.Parameters.AddWithValue("@td", totalD);
                                 cmd.Parameters.AddWithValue("@tc", totalC);
@@ -248,7 +254,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                             }
                         }
 
-                        // ⭐ INSERTION DES LIGNES avec SENS + MONTANT + MONTANT_DEVISE
+                        // ⭐ INSERTION DES LIGNES
                         int ordre = 1;
                         foreach (var l in parsedLignes)
                         {
@@ -274,7 +280,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@lib", string.IsNullOrEmpty((string)l["LIBELLE"]) ? (object)DBNull.Value : l["LIBELLE"]);
                                 cmd.Parameters.AddWithValue("@sens", l["SENS"]);
                                 cmd.Parameters.AddWithValue("@mnt", l["MONTANT"]);
-                                // ⭐ MONTANT_DEVISE : DBNull si 0
                                 decimal mntDev = (decimal)l["MONTANT_DEVISE"];
                                 cmd.Parameters.AddWithValue("@mntdev", mntDev != 0 ? (object)mntDev : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@p1",  l["PLAN1"]  ?? (object)DBNull.Value);
