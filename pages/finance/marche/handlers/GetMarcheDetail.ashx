@@ -38,7 +38,7 @@ public class GetMarcheDetail : IHttpHandler, IRequiresSessionState
                            TYPE_MARCHE, MODE_PASSATION, STATUT,
                            DATE_LANCEMENT, DATE_OUVERTURE_PLIS, DATE_ATTRIBUTION,
                            DATE_SIGNATURE, DATE_DEBUT, DATE_FIN, DELAI_EXECUTION_JOURS,
-                           FOURNISSEUR_ID, FOURNISSEUR_NOM,
+                           FOURNISSEUR_ID, FOURNISSEUR_NOM, AUXILIAIRE,
                            MONTANT_LOC_HT, MONTANT_LOC_TVA, MONTANT_LOC_TTC,
                            MONTANT_DEV_HT, MONTANT_DEV_TVA, MONTANT_DEV_TTC
                     FROM FMARCHE WHERE ID = @id AND DELETION_AT IS NULL", conn))
@@ -66,6 +66,7 @@ public class GetMarcheDetail : IHttpHandler, IRequiresSessionState
                             marche["DELAI_EXECUTION_JOURS"] = r["DELAI_EXECUTION_JOURS"] == DBNull.Value ? (object)null : Convert.ToInt32(r["DELAI_EXECUTION_JOURS"]);
                             marche["FOURNISSEUR_ID"] = r["FOURNISSEUR_ID"] == DBNull.Value ? null : r["FOURNISSEUR_ID"].ToString();
                             marche["FOURNISSEUR_NOM"] = r["FOURNISSEUR_NOM"] == DBNull.Value ? "" : r["FOURNISSEUR_NOM"].ToString();
+                            marche["AUXILIAIRE"] = r["AUXILIAIRE"] == DBNull.Value ? "" : r["AUXILIAIRE"].ToString();
                             marche["MONTANT_LOC_HT"] = Convert.ToDecimal(r["MONTANT_LOC_HT"]);
                             marche["MONTANT_LOC_TVA"] = Convert.ToDecimal(r["MONTANT_LOC_TVA"]);
                             marche["MONTANT_LOC_TTC"] = Convert.ToDecimal(r["MONTANT_LOC_TTC"]);

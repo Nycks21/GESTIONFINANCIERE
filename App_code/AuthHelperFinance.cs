@@ -20,7 +20,6 @@ public static class AuthHelperFinance
   {
     new AuthHelper.MenuItem { Code = "accueil",   Text = "menu.accueil",   Url = "/pages/accueil/index.aspx",                         Icon = "fas fa-chalkboard",       Section = "section.accueil",      Order = 1  },
     new AuthHelper.MenuItem { Code = "accueilc",  Text = "menu.accueilc",  Url = "/pages/finance/accueil/index.aspx",                 Icon = "fas fa-save",       Section = "section.applications", Order = 2  },
-    new AuthHelper.MenuItem { Code = "generale",      Text = "menu.generale",      Url = "/pages/finance/generale/generale.aspx",         Icon = "fas fa-cog",   Section = "section.parametres",   Order = 3  },
     new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-cog",   Section = "section.parametres",   Order = 4  },
     new AuthHelper.MenuItem { Code = "marche",      Text = "menu.marche",      Url = "/pages/finance/marche/marche.aspx",         Icon = "fas fa-clipboard",   Section = "section.parametres",   Order = 5  },
   };

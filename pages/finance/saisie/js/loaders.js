@@ -193,7 +193,7 @@ function populateAuxiliaireOptions(filterByPlanElementId, preserveValue) {
 }
 
 // ============================================================
-// PÉRIODES
+// PÉRIODES (robuste — ne plante pas si handler absent)
 // ============================================================
 async function loadPeriodes(exerciceId) {
     AppState.periodes = [];
@@ -202,13 +202,25 @@ async function loadPeriodes(exerciceId) {
     try {
         var url = API.BASE + API.HANDLERS_PATH + API.PERIODES
                 + '?exerciceId=' + encodeURIComponent(exerciceId);
+
         var resp = await fetch(url);
-        var data = await resp.json();
+        var ct   = (resp.headers.get('content-type') || '').toLowerCase();
+        var text = await resp.text();
+
+        // ⭐ Détection : HTML au lieu de JSON → handler manquant ou erreur serveur
+        if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<') {
+            console.warn('[loadPeriodes] Handler indisponible (HTTP ' + resp.status +
+                         ') — les périodes ne sont pas chargées. Vérifiez GetExercicesPeriodes.ashx');
+            return;  // ⭐ Silencieux : la saisie reste utilisable sans périodes
+        }
+
+        var data = JSON.parse(text);
         if (data.success) {
             AppState.periodes = data.periodes || [];
+            console.log('[loadPeriodes] ' + AppState.periodes.length + ' période(s) chargée(s)');
         }
     } catch (err) {
-        console.error('[loadPeriodes]', err);
+        console.warn('[loadPeriodes] Ignoré :', err.message || err);
     }
 }
 
@@ -225,6 +237,8 @@ function findPeriodeId(dateStr) {
         }
     }
 
+    // ⭐ Fallback : exercice en cours (le serveur acceptera PERIODE_ID = EXERCICE_ID
+    //    si le handler de sauvegarde tolère cette simplification)
     var exerciceId = _getVal('ecrExercice');
     if (exerciceId) return exerciceId;
     return '';

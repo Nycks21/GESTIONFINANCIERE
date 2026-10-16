@@ -7,11 +7,26 @@ $(async function () {
     console.log('🔵 [init] Démarrage');
 
     try {
-        // 1. Attendre la config (max 3 s)
+        // ⭐ 1. Initialisation UI (sidebar, filtres form, etc.)
+        if (typeof initSidebar === 'function') {
+            initSidebar();
+            console.log('✅ [init] Sidebar initialisée');
+        }
+        if (typeof initDarkMode === 'function') {
+            initDarkMode();
+        }
+        if (typeof preventFormAutoSubmit === 'function') {
+            preventFormAutoSubmit();
+        }
+        if (typeof ensureButtonsHaveTypeButton === 'function') {
+            ensureButtonsHaveTypeButton();
+        }
+
+        // ⭐ 2. Attente config (max 3 s)
         await waitForConfig();
         console.log('✅ [init] Config OK');
 
-        // 2. Charger les utilisateurs
+        // ⭐ 3. Chargement des utilisateurs
         await loadUsers();
         console.log('✅ [init] Utilisateurs chargés');
 

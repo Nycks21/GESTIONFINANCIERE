@@ -1181,3 +1181,10 @@ body.saisie-compact .header-exercice select {
     height: 16px;
     min-height: 16px !important;
 }
+
+#marAuxi[data-filtered="1"] {
+    border-left: 3px solid #10B981;
+}
+#marAuxi[data-filtered="0"] {
+    border-left: 3px solid #E5E7EB;
+}

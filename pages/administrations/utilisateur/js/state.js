@@ -4,6 +4,10 @@
 // ÉTAT GLOBAL — Module Utilisateurs
 // ─────────────────────────────────────────────────────────────────────────────
 
+// ⭐ Version courante de l'application (utilisée par le système de MAJ)
+var CURRENT_VERSION = '9.6.1';
+
+// ─── État ───
 var currentMode = null;           // "ajout" | "modification"
 var currentUserId = null;
 var usersData = [];
@@ -18,7 +22,8 @@ var selectedRestoreSource = null;
 var restoreLogs = [];
 var updateCheckInProgress = false;
 
-// Exposer globalement
+// ─── Exposition globale ───
+window.CURRENT_VERSION = CURRENT_VERSION;
 window.currentMode = currentMode;
 window.currentUserId = currentUserId;
 window.usersData = usersData;

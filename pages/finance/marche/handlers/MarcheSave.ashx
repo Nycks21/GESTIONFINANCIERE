@@ -9,6 +9,12 @@ using System.Web.SessionState;
 
 public class MarcheSave : IHttpHandler, IRequiresSessionState
 {
+    // ⭐ Codes valides alignés sur les CHECK constraints DDL
+    private static readonly HashSet<string> VALID_TYPES =
+        new HashSet<string> { "FRT","TRX","SRV","PIS","ATR" };
+    private static readonly HashSet<string> VALID_MODES =
+        new HashSet<string> { "AON","AOI","CST","GAG","EDT","ATR" };
+
     public void ProcessRequest(HttpContext ctx)
     {
         ctx.Response.ContentType = "application/json";
@@ -31,16 +37,26 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
             string siteId          = GetString(data, "siteId");
             string numero          = (GetString(data, "numero") ?? "").Trim();
             string description     = (GetString(data, "description") ?? "").Trim();
-            string typeMarche      = (GetString(data, "typeMarche") ?? "FOURNITURES").Trim().ToUpperInvariant();
-            string modePassation   = (GetString(data, "modePassation") ?? "APPEL_OFFRES_NATIONAL").Trim().ToUpperInvariant();
-            string statut          = (GetString(data, "statut") ?? "ATTRIBUE").Trim().ToUpperInvariant();
+            string typeMarche      = NormalizeCode(GetString(data, "typeMarche"), VALID_TYPES, "FRT");
+            string modePassation   = NormalizeCode(GetString(data, "modePassation"), VALID_MODES, "AON");
             string fournisseurId   = GetString(data, "fournisseurId");
-            string fournisseurNom  = (GetString(data, "fournisseurNom") ?? "").Trim();
+            string auxiliaire      = (GetString(data, "auxiliaire") ?? "").Trim();
             string dateLancement   = GetString(data, "dateLancement");
             string dateAttribution = GetString(data, "dateAttribution");
             string dateSignature   = GetString(data, "dateSignature");
             string dateDebut       = GetString(data, "dateDebut");
             string dateFin         = GetString(data, "dateFin");
+
+            // ⭐ STATUT = TINYINT 1..4
+            byte statut = 1;
+            string statutStr = GetString(data, "statut");
+            if (!string.IsNullOrEmpty(statutStr))
+            {
+                byte tmpSt;
+                if (!byte.TryParse(statutStr, out tmpSt) || tmpSt < 1 || tmpSt > 4)
+                { ctx.Response.Write("{\"success\":false,\"message\":\"Statut invalide (1..4).\"}"); return; }
+                statut = tmpSt;
+            }
 
             if (string.IsNullOrEmpty(numero))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Numéro obligatoire.\"}"); return; }
@@ -51,23 +67,23 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
 
             Guid fourGuid = Guid.Empty;
             bool hasFour = !string.IsNullOrEmpty(fournisseurId) && Guid.TryParse(fournisseurId, out fourGuid);
+            if (!string.IsNullOrEmpty(fournisseurId) && !hasFour)
+            { ctx.Response.Write("{\"success\":false,\"message\":\"Fournisseur invalide.\"}"); return; }
 
             decimal coursDevise = GetDecimal(data, "coursDevise", 0);
-
             var lignes = GetObjectList(data, "lignes");
 
-            // Calcul des totaux
+            // ─── Totaux ───
             decimal totalLocHT = 0, totalLocTVA = 0, totalLocTTC = 0;
             decimal totalDevHT = 0, totalDevTVA = 0, totalDevTTC = 0;
-
             var parsedLignes = new List<Dictionary<string, object>>();
+
             foreach (var l in lignes)
             {
                 decimal taxe = GetDecimal(l, "taxe", 0);
                 decimal locHT = GetDecimal(l, "montantLocHT", 0);
                 decimal locTVA = Math.Round(locHT * taxe / 100m, 4);
                 decimal locTTC = locHT + locTVA;
-
                 decimal rapHT = GetDecimal(l, "montantRapHT", 0);
                 decimal rapTVA = Math.Round(rapHT * taxe / 100m, 4);
                 decimal rapTTC = rapHT + rapTVA;
@@ -76,31 +92,28 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                 totalDevHT += rapHT; totalDevTVA += rapTVA; totalDevTTC += rapTTC;
 
                 var pl = new Dictionary<string, object>();
-                pl["ID"] = GetString(l, "id");
-                pl["ARTICLE_ID"] = GetString(l, "articleId");
-                pl["DESIGNATION"] = GetString(l, "designation");
-                pl["REFERENCE_LIGNE"] = GetString(l, "referenceLigne");
-                pl["EXERCICE_ID"] = GetString(l, "exerciceId");
-                pl["DESCRIPTION"] = GetString(l, "description");
-                pl["TAXE"] = taxe;
-                pl["MONTANT_LOC_HT"] = locHT;
-                pl["MONTANT_LOC_TVA"] = locTVA;
-                pl["MONTANT_LOC_TTC"] = locTTC;
-                pl["MONTANT_RAP_HT"] = rapHT;
-                pl["MONTANT_RAP_TVA"] = rapTVA;
-                pl["MONTANT_RAP_TTC"] = rapTTC;
-                pl["OBSERVATIONS"] = GetString(l, "observations");
+                pl["ID"]                = GetString(l, "id");
+                pl["ARTICLE_ID"]        = GetString(l, "articleId");
+                pl["DESIGNATION"]       = (GetString(l, "designation") ?? "").Trim();
+                pl["REFERENCE_LIGNE"]   = GetString(l, "referenceLigne");
+                pl["EXERCICE_ID"]       = GetString(l, "exerciceId");
+                pl["DESCRIPTION"]       = (GetString(l, "description") ?? "").Trim();
+                pl["TAXE"]              = taxe;
+                pl["MONTANT_LOC_HT"]    = locHT;
+                pl["MONTANT_LOC_TVA"]   = locTVA;
+                pl["MONTANT_LOC_TTC"]   = locTTC;
+                pl["MONTANT_RAP_HT"]    = rapHT;
+                pl["MONTANT_RAP_TVA"]   = rapTVA;
+                pl["MONTANT_RAP_TTC"]   = rapTTC;
+                pl["OBSERVATIONS"]      = GetString(l, "observations");
+                pl["SOURCE_FINANCEMENT"] = GetString(l, "sourceFinancement");
 
                 for (int k = 1; k <= 10; k++)
                 {
                     string plVal = GetString(l, "plan" + k);
-                    if (!string.IsNullOrEmpty(plVal) && Guid.TryParse(plVal, out tmp))
-                        pl["PLAN" + k] = tmp;
-                    else
-                        pl["PLAN" + k] = null;
+                    pl["PLAN" + k] = (!string.IsNullOrEmpty(plVal) && Guid.TryParse(plVal, out tmp))
+                                     ? (object)tmp : null;
                 }
-                pl["SOURCE_FINANCEMENT"] = GetString(l, "sourceFinancement");
-
                 parsedLignes.Add(pl);
             }
 
@@ -116,7 +129,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                 {
                     try
                     {
-                        // Vérif unicité numéro
+                        // ─── Unicité numéro ───
                         using (var cmdChk = new SqlCommand(@"
                             SELECT COUNT(1) FROM FMARCHE
                             WHERE NUMERO = @n AND (@id IS NULL OR ID <> @id)", conn, tx))
@@ -125,6 +138,55 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                             cmdChk.Parameters.AddWithValue("@id", isEdit ? (object)id : DBNull.Value);
                             if (Convert.ToInt32(cmdChk.ExecuteScalar()) > 0)
                                 throw new Exception("Ce numéro de marché existe déjà.");
+                        }
+
+                        string fournisseurNom = null;
+                        if (hasFour)
+                        {
+                            using (var cmdFour = new SqlCommand(@"
+                                SELECT LIBELLE
+                                FROM dbo.PLAN1
+                                WHERE ID = @fourId
+                                  AND CODE LIKE '4%'
+                                  AND ACTIVE = 1
+                                  AND DELETION_AT IS NULL", conn, tx))
+                            {
+                                cmdFour.Parameters.AddWithValue("@fourId", fourGuid);
+                                object label = cmdFour.ExecuteScalar();
+                                if (label == null || label == DBNull.Value)
+                                    throw new Exception("Le compte fournisseur sélectionné n'est plus admissible.");
+                                fournisseurNom = Convert.ToString(label);
+                            }
+                        }
+
+                        // ⭐⭐⭐ VÉRIFICATION D'INTÉGRITÉ : AUXILIAIRE ∈ FOURNISSEUR ⭐⭐⭐
+                        //    Règle métier : l'auxiliaire doit partager le même compte
+                        //    collectif (PLAN_ELEMENT_ID) que le fournisseur sélectionné.
+                        if (!string.IsNullOrEmpty(auxiliaire))
+                        {
+                            if (!hasFour)
+                                throw new Exception(
+                                    "Un auxiliaire est sélectionné mais aucun fournisseur n'est renseigné.");
+
+                            using (var cmdAux = new SqlCommand(@"
+                                SELECT COUNT(1)
+                                FROM dbo.FTIERS t
+                                INNER JOIN dbo.PLAN1 p ON p.ID = t.PLAN_ELEMENT_ID
+                                WHERE p.ID = @fourId
+                                  AND p.CODE LIKE '4%'
+                                  AND p.ACTIVE = 1
+                                  AND p.DELETION_AT IS NULL
+                                  AND t.CODE = @code
+                                  AND t.ACTIVE = 1
+                                  AND t.DELETION_AT IS NULL", conn, tx))
+                            {
+                                cmdAux.Parameters.AddWithValue("@code",   auxiliaire);
+                                cmdAux.Parameters.AddWithValue("@fourId", fourGuid);
+
+                                if (Convert.ToInt32(cmdAux.ExecuteScalar()) == 0)
+                                    throw new Exception(
+                                        "L'auxiliaire sélectionné n'appartient pas au compte collectif du fournisseur choisi.");
+                            }
                         }
 
                         if (isEdit)
@@ -136,6 +198,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                     DATE_LANCEMENT=@dl, DATE_ATTRIBUTION=@da, DATE_SIGNATURE=@ds,
                                     DATE_DEBUT=@dd, DATE_FIN=@df,
                                     FOURNISSEUR_ID=@fourId, FOURNISSEUR_NOM=@fourNom,
+                                    AUXILIAIRE=@auxi,
                                     MONTANT_LOC_HT=@tlh, MONTANT_LOC_TVA=@tlt, MONTANT_LOC_TTC=@ltt,
                                     MONTANT_DEV_HT=@tdh, MONTANT_DEV_TVA=@tdt, MONTANT_DEV_TTC=@dtt,
                                     UPDATED_BY=@u, UPDATED_AT=GETDATE()
@@ -144,13 +207,14 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                 AddHeaderParams(cmd, siteGuid, hasSite, numero, description, coursDevise,
                                     typeMarche, modePassation, statut, dateLancement, dateAttribution,
                                     dateSignature, dateDebut, dateFin, fourGuid, hasFour, fournisseurNom,
-                                    totalLocHT, totalLocTVA, totalLocTTC, totalDevHT, totalDevTVA, totalDevTTC, userId);
+                                    auxiliaire, totalLocHT, totalLocTVA, totalLocTTC,
+                                    totalDevHT, totalDevTVA, totalDevTTC, userId);
                                 cmd.Parameters.AddWithValue("@id", id);
                                 cmd.ExecuteNonQuery();
                             }
 
                             using (var cmdDel = new SqlCommand(
-                                "UPDATE FMARCHE_LIGNE SET DELETION_AT = GETDATE(), DELETION_BY = @u WHERE MARCHE_ID = @id", conn, tx))
+                                "UPDATE FMARCHE_LIGNE SET DELETION_AT = GETDATE(), DELETION_BY = @u WHERE MARCHE_ID = @id AND DELETION_AT IS NULL", conn, tx))
                             {
                                 cmdDel.Parameters.AddWithValue("@id", id);
                                 cmdDel.Parameters.AddWithValue("@u", userId);
@@ -165,7 +229,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                      TYPE_MARCHE, MODE_PASSATION, STATUT,
                                      DATE_LANCEMENT, DATE_ATTRIBUTION, DATE_SIGNATURE,
                                      DATE_DEBUT, DATE_FIN,
-                                     FOURNISSEUR_ID, FOURNISSEUR_NOM,
+                                     FOURNISSEUR_ID, FOURNISSEUR_NOM, AUXILIAIRE,
                                      MONTANT_LOC_HT, MONTANT_LOC_TVA, MONTANT_LOC_TTC,
                                      MONTANT_DEV_HT, MONTANT_DEV_TVA, MONTANT_DEV_TTC,
                                      CREATED_BY, CREATED_AT)
@@ -174,7 +238,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                      @tm, @mp, @st,
                                      @dl, @da, @ds,
                                      @dd, @df,
-                                     @fourId, @fourNom,
+                                     @fourId, @fourNom, @auxi,
                                      @tlh, @tlt, @ltt,
                                      @tdh, @tdt, @dtt,
                                      @u, GETDATE())", conn, tx))
@@ -182,13 +246,14 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                 AddHeaderParams(cmd, siteGuid, hasSite, numero, description, coursDevise,
                                     typeMarche, modePassation, statut, dateLancement, dateAttribution,
                                     dateSignature, dateDebut, dateFin, fourGuid, hasFour, fournisseurNom,
-                                    totalLocHT, totalLocTVA, totalLocTTC, totalDevHT, totalDevTVA, totalDevTTC, userId);
+                                    auxiliaire, totalLocHT, totalLocTVA, totalLocTTC,
+                                    totalDevHT, totalDevTVA, totalDevTTC, userId);
                                 cmd.Parameters.AddWithValue("@id", finalId);
                                 cmd.ExecuteNonQuery();
                             }
                         }
 
-                        // Insertion des lignes
+                        // ─── Lignes ───
                         int ordre = 1;
                         foreach (var l in parsedLignes)
                         {
@@ -211,11 +276,11 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@id", Guid.NewGuid().ToString());
                                 cmd.Parameters.AddWithValue("@mid", finalId);
                                 cmd.Parameters.AddWithValue("@o", ordre++);
-                                cmd.Parameters.AddWithValue("@aid", string.IsNullOrEmpty((string)l["ARTICLE_ID"]) ? (object)DBNull.Value : l["ARTICLE_ID"]);
+                                cmd.Parameters.AddWithValue("@aid", NullIfEmpty(l["ARTICLE_ID"]));
                                 cmd.Parameters.AddWithValue("@des", l["DESIGNATION"]);
-                                cmd.Parameters.AddWithValue("@ref", string.IsNullOrEmpty((string)l["REFERENCE_LIGNE"]) ? (object)DBNull.Value : l["REFERENCE_LIGNE"]);
-                                cmd.Parameters.AddWithValue("@exid", string.IsNullOrEmpty((string)l["EXERCICE_ID"]) ? (object)DBNull.Value : l["EXERCICE_ID"]);
-                                cmd.Parameters.AddWithValue("@desc", string.IsNullOrEmpty((string)l["DESCRIPTION"]) ? (object)DBNull.Value : l["DESCRIPTION"]);
+                                cmd.Parameters.AddWithValue("@ref", NullIfEmpty(l["REFERENCE_LIGNE"]));
+                                cmd.Parameters.AddWithValue("@exid", NullIfEmpty(l["EXERCICE_ID"]));
+                                cmd.Parameters.AddWithValue("@desc", l["DESCRIPTION"]);
                                 cmd.Parameters.AddWithValue("@taxe", l["TAXE"]);
                                 cmd.Parameters.AddWithValue("@lh", l["MONTANT_LOC_HT"]);
                                 cmd.Parameters.AddWithValue("@lt", l["MONTANT_LOC_TVA"]);
@@ -233,8 +298,8 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@p8",  l["PLAN8"]  ?? (object)DBNull.Value);
                                 cmd.Parameters.AddWithValue("@p9",  l["PLAN9"]  ?? (object)DBNull.Value);
                                 cmd.Parameters.AddWithValue("@p10", l["PLAN10"] ?? (object)DBNull.Value);
-                                cmd.Parameters.AddWithValue("@src", string.IsNullOrEmpty((string)l["SOURCE_FINANCEMENT"]) ? (object)DBNull.Value : l["SOURCE_FINANCEMENT"]);
-                                cmd.Parameters.AddWithValue("@obs", string.IsNullOrEmpty((string)l["OBSERVATIONS"]) ? (object)DBNull.Value : l["OBSERVATIONS"]);
+                                cmd.Parameters.AddWithValue("@src", NullIfEmpty(l["SOURCE_FINANCEMENT"]));
+                                cmd.Parameters.AddWithValue("@obs", NullIfEmpty(l["OBSERVATIONS"]));
                                 cmd.Parameters.AddWithValue("@u", userId);
                                 cmd.ExecuteNonQuery();
                             }
@@ -242,11 +307,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
 
                         tx.Commit();
                     }
-                    catch
-                    {
-                        try { tx.Rollback(); } catch { }
-                        throw;
-                    }
+                    catch { try { tx.Rollback(); } catch { } throw; }
                 }
             }
 
@@ -271,12 +332,30 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
         }
     }
 
+    // ══════════════════════════════════════════════════════════════
+    // HELPERS
+    // ══════════════════════════════════════════════════════════════
+
+    private static object NullIfEmpty(object v)
+    {
+        if (v == null) return DBNull.Value;
+        string s = v as string;
+        return (s != null && s.Length == 0) ? (object)DBNull.Value : v;
+    }
+
+    private static string NormalizeCode(string raw, HashSet<string> valid, string fallback)
+    {
+        if (string.IsNullOrEmpty(raw)) return fallback;
+        string up = raw.Trim().ToUpperInvariant();
+        return valid.Contains(up) ? up : fallback;
+    }
+
     private void AddHeaderParams(SqlCommand cmd, Guid siteGuid, bool hasSite,
         string numero, string description, decimal coursDevise,
-        string typeMarche, string modePassation, string statut,
+        string typeMarche, string modePassation, byte statut,
         string dateLancement, string dateAttribution, string dateSignature,
         string dateDebut, string dateFin,
-        Guid fourGuid, bool hasFour, string fournisseurNom,
+        Guid fourGuid, bool hasFour, string fournisseurNom, string auxiliaire,
         decimal tlh, decimal tlt, decimal ltt,
         decimal tdh, decimal tdt, decimal dtt, int userId)
     {
@@ -287,20 +366,33 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
         cmd.Parameters.AddWithValue("@tm", typeMarche);
         cmd.Parameters.AddWithValue("@mp", modePassation);
         cmd.Parameters.AddWithValue("@st", statut);
-        cmd.Parameters.AddWithValue("@dl", string.IsNullOrEmpty(dateLancement) ? (object)DBNull.Value : DateTime.Parse(dateLancement));
-        cmd.Parameters.AddWithValue("@da", string.IsNullOrEmpty(dateAttribution) ? (object)DBNull.Value : DateTime.Parse(dateAttribution));
-        cmd.Parameters.AddWithValue("@ds", string.IsNullOrEmpty(dateSignature) ? (object)DBNull.Value : DateTime.Parse(dateSignature));
-        cmd.Parameters.AddWithValue("@dd", string.IsNullOrEmpty(dateDebut) ? (object)DBNull.Value : DateTime.Parse(dateDebut));
-        cmd.Parameters.AddWithValue("@df", string.IsNullOrEmpty(dateFin) ? (object)DBNull.Value : DateTime.Parse(dateFin));
+        cmd.Parameters.AddWithValue("@dl", ParseDateOrNull(dateLancement));
+        cmd.Parameters.AddWithValue("@da", ParseDateOrNull(dateAttribution));
+        cmd.Parameters.AddWithValue("@ds", ParseDateOrNull(dateSignature));
+        cmd.Parameters.AddWithValue("@dd", ParseDateOrNull(dateDebut));
+        cmd.Parameters.AddWithValue("@df", ParseDateOrNull(dateFin));
         cmd.Parameters.AddWithValue("@fourId", hasFour ? (object)fourGuid : DBNull.Value);
         cmd.Parameters.AddWithValue("@fourNom", string.IsNullOrEmpty(fournisseurNom) ? (object)DBNull.Value : fournisseurNom);
-        cmd.Parameters.AddWithValue("@tlh", tlh); cmd.Parameters.AddWithValue("@tlt", tlt); cmd.Parameters.AddWithValue("@ltt", ltt);
-        cmd.Parameters.AddWithValue("@tdh", tdh); cmd.Parameters.AddWithValue("@tdt", tdt); cmd.Parameters.AddWithValue("@dtt", dtt);
+        cmd.Parameters.AddWithValue("@auxi", string.IsNullOrEmpty(auxiliaire) ? (object)DBNull.Value : auxiliaire);
+        cmd.Parameters.AddWithValue("@tlh", tlh);
+        cmd.Parameters.AddWithValue("@tlt", tlt);
+        cmd.Parameters.AddWithValue("@ltt", ltt);
+        cmd.Parameters.AddWithValue("@tdh", tdh);
+        cmd.Parameters.AddWithValue("@tdt", tdt);
+        cmd.Parameters.AddWithValue("@dtt", dtt);
         cmd.Parameters.AddWithValue("@u", userId);
+    }
+
+    private static object ParseDateOrNull(string s)
+    {
+        if (string.IsNullOrEmpty(s)) return DBNull.Value;
+        DateTime d;
+        return DateTime.TryParse(s, out d) ? (object)d : DBNull.Value;
     }
 
     private string GetString(Dictionary<string, object> data, string key)
     { return data.ContainsKey(key) && data[key] != null ? data[key].ToString() : null; }
+
     private decimal GetDecimal(Dictionary<string, object> data, string key, decimal def)
     {
         decimal v;
@@ -309,6 +401,7 @@ public class MarcheSave : IHttpHandler, IRequiresSessionState
                 System.Globalization.CultureInfo.InvariantCulture, out v)) return v;
         return def;
     }
+
     private List<Dictionary<string, object>> GetObjectList(Dictionary<string, object> data, string key)
     {
         var result = new List<Dictionary<string, object>>();

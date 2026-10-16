@@ -629,23 +629,30 @@ public static class AuthHelper
                     </div>");
 
       if (IsSuperAdmin())
-      {
-        html.Append(@"
-                    <div class=""control-sidebar-actions"">
-                        <button type=""button"" id=""btnCheckUpdates"" class=""control-btn control-btn-primary"" onclick=""checkForUpdates()"">
-                            <i class=""fas fa-sync-alt""></i>
-                            <span>" + T("CheckUpdates") + @"</span>
-                        </button>
-                        <button type=""button"" id=""btnBackup"" class=""control-btn control-btn-success"" onclick=""backupDatabase()"">
-                            <i class=""fas fa-database""></i>
-                            <span>" + T("Backup") + @"</span>
-                        </button>
-                        <button type=""button"" id=""btnRestore"" class=""control-btn control-btn-warning"" onclick=""openRestoreModal()"">
-                            <i class=""fas fa-undo-alt""></i>
-                            <span>" + T("Restore") + @"</span>
-                        </button>
-                    </div>");
-      }
+{
+    html.Append(@"
+                <div class=""control-sidebar-actions"">
+                    <button type=""button"" id=""btnCheckUpdates"" class=""control-btn control-btn-primary"" onclick=""checkForUpdates()"">
+                        <i class=""fas fa-sync-alt""></i>
+                        <span>" + T("CheckUpdates") + @"</span>
+                    </button>
+
+                    <button type=""button"" id=""btnUpdateDatabase"" class=""control-btn control-btn-info"" onclick=""updateDatabase()"">
+                        <i class=""fas fa-database""></i>
+                        <span>" + T("UpdateDatabase") + @"</span>
+                    </button>
+
+                    <button type=""button"" id=""btnBackup"" class=""control-btn control-btn-success"" onclick=""backupDatabase()"">
+                        <i class=""fas fa-save""></i>
+                        <span>" + T("Backup") + @"</span>
+                    </button>
+
+                    <button type=""button"" id=""btnRestore"" class=""control-btn control-btn-warning"" onclick=""openRestoreModal()"">
+                        <i class=""fas fa-undo-alt""></i>
+                        <span>" + T("Restore") + @"</span>
+                    </button>
+                </div>");
+}
 
       html.Append(@"
                 </div>

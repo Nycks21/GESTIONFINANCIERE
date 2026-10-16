@@ -96,7 +96,7 @@ public class GetEcritures : IHttpHandler, IRequiresSessionState
                     LEFT JOIN FJOURNAL j ON j.ID = e.JOURNAL_ID
                     LEFT JOIN FMONNAIE m ON m.ID = e.MONNAIE_ID
                     " + whereClause + @"
-                    ORDER BY e.DATE_COMPTABLE DESC, e.CREATED_AT DESC
+                    ORDER BY e.DATE_COMPTABLE ASC
                     OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
                 using (SqlCommand cmd = new SqlCommand(selectSql, conn))

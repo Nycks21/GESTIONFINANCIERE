@@ -25,9 +25,10 @@ public static class AuthHelperDashboard
     new AuthHelper.MenuItem { Code = "accueilc",     Text = "menu.accueilc",     Url = "/pages/finance/accueil/index.aspx",                    Icon = "fas fa-save",   Section = "section.applications",   Order = 3  },
 
     // ---- Administration ----
-    new AuthHelper.MenuItem { Code = "resetpwd",     Text = "menu.resetpwd",     Url = "/pages/administrations/reset/resetpwd.aspx",           Icon = "fas fa-key",          Section = "section.administration", Order = 4 },
-    new AuthHelper.MenuItem { Code = "utilisateurs", Text = "menu.utilisateurs", Url = "/pages/administrations/utilisateur/utilisateur.aspx",  Icon = "fas fa-user-cog",     Section = "section.administration", Order = 5 },
-    new AuthHelper.MenuItem { Code = "requetes",     Text = "menu.requetes",     Url = "/pages/administrations/requete/requetes.aspx",         Icon = "fas fa-terminal",     Section = "section.administration", Order = 6 },
+    new AuthHelper.MenuItem { Code = "generale",      Text = "menu.generale",    Url = "/pages/generale/generale.aspx",         Icon = "fas fa-cog",   Section = "section.parametres",   Order = 4  },
+    new AuthHelper.MenuItem { Code = "resetpwd",     Text = "menu.resetpwd",     Url = "/pages/administrations/reset/resetpwd.aspx",           Icon = "fas fa-key",          Section = "section.administration", Order = 5 },
+    new AuthHelper.MenuItem { Code = "utilisateurs", Text = "menu.utilisateurs", Url = "/pages/administrations/utilisateur/utilisateur.aspx",  Icon = "fas fa-user-cog",     Section = "section.administration", Order = 6 },
+    new AuthHelper.MenuItem { Code = "requetes",     Text = "menu.requetes",     Url = "/pages/administrations/requete/requetes.aspx",         Icon = "fas fa-terminal",     Section = "section.administration", Order = 7 },
   };
 
   public static readonly Dictionary<string, string> CheckboxIdByCode = new Dictionary<string, string>

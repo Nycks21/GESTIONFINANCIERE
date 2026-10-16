@@ -9,7 +9,7 @@
  * Copyright 2011-2021 The Bootstrap Authors
  * Copyright 2011-2021 Twitter, Inc.
  * Licensed under MIT (https://github.com/twbs/bootstrap/blob/main/LICENSE)
- 
+
  */
 :root {
     --blue: #007bff;
@@ -2869,6 +2869,7 @@ textarea.form-control.is-invalid {
     font-weight: 400;
     color: #212529;
     text-align: center;
+    text-decoration: none;
     vertical-align: middle;
     -webkit-user-select: none;
     -moz-user-select: none;
@@ -55856,7 +55857,7 @@ a.text-muted:hover {
 }
 
 .nav-link :active {
-    
+
 }
 
 /*# sourceMappingURL=adminlte.min.css.map */

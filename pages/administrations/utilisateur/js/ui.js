@@ -286,10 +286,32 @@ function initSidebar() {
     var toggleBtn = document.getElementById("toggleSidebarBtn");
     var closeBtn  = document.getElementById("closeSidebarBtn");
     var overlay   = document.getElementById("sidebarOverlay");
-    if (toggleBtn) toggleBtn.addEventListener("click", openSidebar);
-    if (closeBtn)  closeBtn.addEventListener("click", closeSidebar);
-    if (overlay)   overlay.addEventListener("click", closeSidebar);
-    document.addEventListener("keydown", function (e) { if (e.key === "Escape") closeSidebar(); });
+
+    if (toggleBtn && !toggleBtn.dataset.bound) {
+        toggleBtn.dataset.bound = '1';
+        toggleBtn.addEventListener("click", function (e) {
+            e.preventDefault();
+            openSidebar();
+        });
+    }
+    if (closeBtn && !closeBtn.dataset.bound) {
+        closeBtn.dataset.bound = '1';
+        closeBtn.addEventListener("click", closeSidebar);
+    }
+    if (overlay && !overlay.dataset.bound) {
+        overlay.dataset.bound = '1';
+        overlay.addEventListener("click", closeSidebar);
+    }
+
+    // Fermeture avec Escape (attache une seule fois)
+    if (!document.body.dataset.sidebarEscBound) {
+        document.body.dataset.sidebarEscBound = '1';
+        document.addEventListener("keydown", function (e) {
+            if (e.key === "Escape") closeSidebar();
+        });
+    }
+
+    console.log('[ui.js] Sidebar initialisée (bouton =', !!toggleBtn, ')');
 }
 
 function initDarkMode() { /* Optionnel */ }

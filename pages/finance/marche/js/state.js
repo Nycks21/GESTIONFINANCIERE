@@ -9,12 +9,14 @@ const AppState = {
     filters: { search: '', statut: '', typeMarche: '' },
 
     // Référentiels
-    sites: [],
-    fournisseurs: [],
-    articles: [],
-    monnaies: [],
-    plansActifs: [],
-    tiers: [],
+    sites:         [],
+    fournisseurs:  [],
+    articles:      [],
+    monnaies:      [],
+    plansActifs:   [],
+    tiers:         [],
+    comptesParPlan: {},
+    periodes:      [],
 
     // Édition
     editingId: null,

@@ -1,9 +1,9 @@
-// i18n-refresh.js — Rafraîchissement dynamique au changement de langue
+// i18n-refresh.js — Rafraîchissement dynamique au changement de langue (MARCHE)
 'use strict';
 
 function refreshI18nDynamic() {
     try {
-        // 1) Re-render des en-têtes de plans (labels dynamiques FPLAN_HEADER.CODE)
+        // 1) Re-render des en-têtes de plans
         if (typeof renderGridHead === 'function') {
             var sel = AppState && AppState.selectedLigneIndex;
             renderGridHead();
@@ -29,46 +29,30 @@ function refreshI18nDynamic() {
             });
         }
 
-        // 3) Re-render de la liste des écritures
-        //    ⭐ Si Vue est présent, il gère son propre rendu via réactivité
-        if (window._VueSaisieList) {
-            // Déclenche un re-render Vue en forçant un tick réactif
+        // 3) Re-render de la liste des marchés (Vue gère son rendu)
+        if (window._VueMarcheList) {
             window.dispatchEvent(new Event('languagechange'));
-        } else if (typeof renderEcrituresList === 'function') {
-            renderEcrituresList();
         }
 
-        // 4) Re-render des lignes d'écriture déployées (fallback vanilla uniquement)
-        if (!window._VueSaisieList
-            && AppState && AppState.expandedEcritures
-            && typeof buildEcritureLinesRow === 'function') {
-            Object.keys(AppState.expandedEcritures).forEach(function (ecrId) {
-                if (!AppState.expandedEcritures[ecrId]) return;
-                var lignes = AppState.ecritureLinesCache && AppState.ecritureLinesCache[ecrId];
-                if (!lignes) return;
-                var sub = document.querySelector('tr.ecr-sub-row[data-ecriture-id="' + ecrId + '"]');
-                if (!sub) return;
-                var tmp = document.createElement('tbody');
-                tmp.innerHTML = buildEcritureLinesRow(ecrId, lignes);
-                sub.parentNode.replaceChild(tmp.firstChild, sub);
-            });
-        }
-
-        // 5) Re-render du hint auxiliaire
+        // 4) Re-render du hint auxiliaire
         if (typeof refreshAuxiliaireField === 'function') {
             var aux = document.getElementById('flAux');
-            if (aux) {
-                refreshAuxiliaireField({ preserveValue: true });
-            }
+            if (aux) refreshAuxiliaireField({ preserveValue: true });
         }
 
-        // 6) Re-render du compteur de lignes
+        var marcheAuxHint = document.getElementById('marAuxHint');
+        if (marcheAuxHint) {
+            var marcheAuxHintKey = marcheAuxHint.getAttribute('data-hint-key');
+            if (marcheAuxHintKey) marcheAuxHint.textContent = _t(marcheAuxHintKey) || '';
+        }
+
+        // 5) Re-render du compteur de lignes
         _refreshLinesCounter();
 
-        // 7) Re-render des options dynamiques déjà chargées
+        // 6) Re-render des options dynamiques déjà chargées
         if (typeof populateHeaderSelects === 'function') {
             var saveVals = {};
-            ['ecrSite','ecrJournal','ecrExercice','ecrDevise','flMode','flSub'].forEach(function (id) {
+            ['marSite','marFournisseur','marArticle'].forEach(function (id) {
                 var el = document.getElementById(id);
                 if (el) saveVals[id] = el.value;
             });
@@ -79,32 +63,20 @@ function refreshI18nDynamic() {
             });
         }
 
-        // 8) Compteur de résultats (fallback vanilla uniquement)
-        if (!window._VueSaisieList && AppState && AppState.total != null) {
-            var c = document.getElementById('resultsCounter');
-            if (c) c.textContent = AppState.total + ' ' + _t('saisie.counter_unit');
-        }
-
         console.log('[i18n-refresh] Composants dynamiques rafraîchis.');
     } catch (err) {
         console.error('[i18n-refresh] Erreur :', err);
     }
 }
 
-// ============================================================
-// COMPTEUR DE LIGNES
-// ============================================================
 function _refreshLinesCounter() {
-    var el = document.getElementById('ecrLinesCounter');
+    var el = document.getElementById('marLinesCounter');
     if (!el || !AppState || !AppState.lignes) return;
     var n = AppState.lignes.length;
-    el.textContent = '(' + n + ' ' + _t('saisie.lines_count_unit') + ')';
+    el.textContent = '(' + n + ' ' + _t('marche.lines_count_unit') + ')';
     el.style.display = n > 0 ? 'inline-block' : 'none';
 }
 
-// ============================================================
-// ÉCOUTE DU CHANGEMENT DE LANGUE
-// ============================================================
 document.addEventListener('languagechange', refreshI18nDynamic);
 
 document.addEventListener('DOMContentLoaded', function () {
@@ -119,7 +91,6 @@ document.addEventListener('DOMContentLoaded', function () {
 document.addEventListener('DOMContentLoaded', function () {
     var html = document.documentElement;
     var lastLang = html.getAttribute('lang');
-
     var obs = new MutationObserver(function () {
         var cur = html.getAttribute('lang');
         if (cur && cur !== lastLang) {
@@ -130,9 +101,6 @@ document.addEventListener('DOMContentLoaded', function () {
     obs.observe(html, { attributes: true, attributeFilter: ['lang'] });
 });
 
-// ============================================================
-// EXPOSITION GLOBALE
-// ============================================================
 window.refreshI18nDynamic = refreshI18nDynamic;
 
 console.log('[i18n-refresh] Module chargé.');

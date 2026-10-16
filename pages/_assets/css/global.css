@@ -4878,3 +4878,21 @@ body.dark-mode .pwd-strength-bar {
   animation-duration: 0.001ms !important;
   animation-delay: 0ms !important;
 }
+
+/* ═══════════════ BOUTON INFO (Update Database) ═══════════════ */
+.control-btn-info {
+    background: linear-gradient(135deg, #17a2b8, #138496);
+    color: #FFFFFF;
+    border: 1px solid #138496;
+}
+
+.control-btn-info:hover {
+    background: linear-gradient(135deg, #138496, #0f6674);
+    color: #FFFFFF;
+    border-color: #0f6674;
+    transform: translateY(-1px);
+}
+
+.control-btn-info:active {
+    transform: translateY(0);
+}

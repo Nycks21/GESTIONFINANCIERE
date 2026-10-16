@@ -1361,6 +1361,139 @@ function autoCheckForUpdates() {
 }
 
 // ============================================================================
+// MISE À JOUR DE LA BASE (MIGRATIONS IDEMPOTENTES)
+// ============================================================================
+async function updateDatabase() {
+    var userRole = document.getElementById("hfUserRole")?.value;
+    if (userRole !== "0") {
+        Swal.fire({
+            icon: "error",
+            title: T('users.update_db.access_denied', 'Accès refusé'),
+            text:  T('users.update_db.access_denied_text',
+                     'Seul un Super Admin peut mettre à jour la base de données.'),
+            confirmButtonColor: "#dc3545"
+        });
+        return;
+    }
+
+    // ─── Confirmation ───
+    var confirm = await Swal.fire({
+        title: T('users.update_db.confirm_title', '🔄 Mettre à jour la base de données'),
+        html:
+            '<div style="text-align:left;font-size:13px;">' +
+                '<p><strong>' + T('users.update_db.confirm_intro', 'Cette opération va :') + '</strong></p>' +
+                '<ul style="padding-left:20px;">' +
+                    '<li>' + T('users.update_db.confirm_1', 'Appliquer les migrations manquantes') + '</li>' +
+                    '<li>' + T('users.update_db.confirm_2', 'Ajouter les colonnes / tables / contraintes manquantes') + '</li>' +
+                    '<li style="color:#28a745;"><strong>' +
+                        T('users.update_db.confirm_3', 'NE PAS toucher aux données existantes') +
+                    '</strong></li>' +
+                '</ul>' +
+                '<div style="background:#fff3cd;border-left:4px solid #ffc107;padding:10px;border-radius:5px;">' +
+                    '<i class="fas fa-info-circle" style="color:#ffc107;"></i> ' +
+                    '<span style="font-size:12px;">' +
+                        T('users.update_db.confirm_hint',
+                          'Aucune donnée ne sera supprimée ni écrasée.') +
+                    '</span>' +
+                '</div>' +
+            '</div>',
+        icon: "warning",
+        showCancelButton: true,
+        confirmButtonText: T('users.update_db.confirm_yes', 'Oui, mettre à jour'),
+        cancelButtonText:  T('button.cancel', 'Annuler'),
+        confirmButtonColor: "#ffc107",
+        cancelButtonColor:  "#6c757d"
+    });
+
+    if (!confirm.isConfirmed) return;
+
+    // ─── Progression ───
+    Swal.fire({
+        title: T('users.update_db.progress_title', 'Mise à jour en cours...'),
+        html: '<div style="text-align:left;font-family:monospace;font-size:12px;' +
+              'max-height:200px;overflow-y:auto;background:#f8f9fa;padding:10px;' +
+              'border-radius:6px;">' +
+                '<div style="color:#007bff;">⏳ ' +
+                    T('users.update_db.init', 'Initialisation...') +
+                '</div>' +
+              '</div>',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        showConfirmButton: false,
+        didOpen: function () { Swal.showLoading(); }
+    });
+
+    try {
+        var resp = await fetch(apiUrl(API_USERS.updateDatabase), {
+            method: "POST",
+            headers: { "Content-Type": "application/x-www-form-urlencoded" },
+            body: ""
+        });
+
+        if (!resp.ok) {
+            var errTxt = "";
+            try { errTxt = await resp.text(); } catch (e) { }
+            throw new Error(errTxt || ('HTTP ' + resp.status));
+        }
+
+        var data = await resp.json();
+
+        // ─── Construction du rapport ───
+        var logHtml = '';
+
+        if (data.applied && data.applied.length) {
+            logHtml += '<div style="color:#28a745;font-weight:bold;margin-bottom:5px;">' +
+                '✅ ' + T('users.update_db.applied', 'Migrations appliquées :') + '</div>';
+            data.applied.forEach(function (m) {
+                logHtml += '<div style="color:#28a745;padding-left:12px;font-size:12px;">' +
+                    '• [' + escapeHtml(m.version) + '] ' + escapeHtml(m.description) + '</div>';
+            });
+        }
+
+        if (data.skipped && data.skipped.length) {
+            logHtml += '<div style="color:#6c757d;font-weight:bold;margin-top:10px;margin-bottom:5px;">' +
+                '⏭️ ' + T('users.update_db.skipped', 'Déjà à jour :') + '</div>';
+            data.skipped.forEach(function (m) {
+                logHtml += '<div style="color:#6c757d;padding-left:12px;font-size:12px;">' +
+                    '• [' + escapeHtml(m.version) + '] ' + escapeHtml(m.description) + '</div>';
+            });
+        }
+
+        if (data.errors && data.errors.length) {
+            logHtml += '<div style="color:#dc3545;font-weight:bold;margin-top:10px;margin-bottom:5px;">' +
+                '❌ ' + T('users.update_db.errors', 'Erreurs :') + '</div>';
+            data.errors.forEach(function (m) {
+                logHtml += '<div style="color:#dc3545;padding-left:12px;font-size:12px;">' +
+                    '• [' + escapeHtml(m.version) + '] ' + escapeHtml(m.description) +
+                    '<br><span style="color:#a00;margin-left:16px;">→ ' +
+                    escapeHtml(m.error) + '</span></div>';
+            });
+        }
+
+        await Swal.fire({
+            icon: data.success ? 'success' : 'error',
+            title: data.success
+                ? T('users.update_db.done_title', '✅ Mise à jour terminée')
+                : T('users.update_db.error_title', '❌ Erreur'),
+            html: '<div style="text-align:left;max-height:400px;overflow-y:auto;">' +
+                  logHtml + '</div>',
+            confirmButtonText: T('users.msg.ok', 'OK'),
+            confirmButtonColor: data.success ? '#28a745' : '#dc3545'
+        });
+
+    } catch (err) {
+        await Swal.fire({
+            icon: 'error',
+            title: T('users.msg.error_title', 'Erreur'),
+            text: err.message,
+            confirmButtonText: T('users.msg.ok', 'OK')
+        });
+    }
+}
+
+
+
+// ============================================================================
 // EXPOSITIONS GLOBALES
 // ============================================================================
 window.applyDefaultPermissionsByRole   = applyDefaultPermissionsByRole;
@@ -1381,3 +1514,4 @@ window.loadBackupList                  = loadBackupList;
 window.selectBackupFile                = selectBackupFile;
 window.handleRestoreFileSelect         = handleRestoreFileSelect;
 window.showRestoreInfo                 = showRestoreInfo;
+window.updateDatabase                  = updateDatabase;

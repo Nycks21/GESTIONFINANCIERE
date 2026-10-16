@@ -1,31 +1,31 @@
-// totaux.js — Calcul temps réel des totaux
+// totaux.js — MARCHE (calcul des totaux HT/TVA/TTC locaux et rapprochement)
 'use strict';
 
 function computeTotaux() {
-    var debitLocal = 0, creditLocal = 0;
-    var debitRep = 0, creditRep = 0;
+    var totLocHT = 0, totLocTVA = 0, totLocTTC = 0;
+    var totRapHT = 0, totRapTVA = 0, totRapTTC = 0;
 
     (AppState.lignes || []).forEach(function (l) {
-        debitLocal  += (l.debit  || 0);
-        creditLocal += (l.credit || 0);
-        if (l.sens === 'D') debitRep  += (l.montantRep || 0);
-        if (l.sens === 'C') creditRep += (l.montantRep || 0);
+        totLocHT  += (l.montantLocHT  || 0);
+        totLocTVA += (l.montantLocTVA || 0);
+        totLocTTC += (l.montantLocTTC || 0);
+        totRapHT  += (l.montantRapHT  || 0);
+        totRapTVA += (l.montantRapTVA || 0);
+        totRapTTC += (l.montantRapTTC || 0);
     });
 
-    _setText('ttDebitLocal',  formatMontant(debitLocal));
-    _setText('ttCreditLocal', formatMontant(creditLocal));
-    _setText('ttSolde',       formatMontant(debitLocal - creditLocal));
-    _setText('ttDebitRep',    formatMontant(debitRep));
-    _setText('ttCreditRep',   formatMontant(creditRep));
+    _setText('ttLocHT',  formatMontant(totLocHT));
+    _setText('ttLocTVA', formatMontant(totLocTVA));
+    _setText('ttLocTTC', formatMontant(totLocTTC));
+    _setText('ttRapHT',  formatMontant(totRapHT));
+    _setText('ttRapTVA', formatMontant(totRapTVA));
+    _setText('ttRapTTC', formatMontant(totRapTTC));
 
-    if (typeof updateSaveButtonState === 'function') {
-        updateSaveButtonState();
-    }
+    if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
 
     return {
-        debitLocal: debitLocal, creditLocal: creditLocal,
-        debitRep: debitRep, creditRep: creditRep,
-        ecart: debitLocal - creditLocal
+        totLocHT: totLocHT, totLocTVA: totLocTVA, totLocTTC: totLocTTC,
+        totRapHT: totRapHT, totRapTVA: totRapTVA, totRapTTC: totRapTTC
     };
 }
 

@@ -157,9 +157,15 @@
             function statusLabel(s) { return t('marche.statut.' + (s || 'ATTRIBUE')) || s; }
             function typeLabel(tp) { return t('marche.type.' + (tp || 'AUTRE')) || tp; }
 
-            function editMarche(id) { if (typeof editMarche === 'function') editMarche(id); }
-            function delMarche(id) { if (typeof deleteMarche === 'function') deleteMarche(id); }
-            function newMarche() { if (typeof newMarche === 'function') newMarche(); }
+            // ⭐ NOUVEAU : bridge vers les fonctions GLOBALES (pas de shadowing)
+            function _callGlobal(name, arg) {
+                if (typeof window[name] === 'function') {
+                    return arg !== undefined ? window[name](arg) : window[name]();
+                }
+            }
+            function editMarcheBridge(id) { _callGlobal('editMarche', id); }
+            function delMarcheBridge(id)  { _callGlobal('deleteMarche', id); }
+            function newMarcheBridge()    { _callGlobal('newMarche'); }
 
             window._VueMarcheList = {
                 vm: vm, load: load, toggleLines: toggleLines, resetFilters: resetFilters
@@ -174,7 +180,9 @@
                 statusClass, statusLabel, typeLabel,
                 onSearchInput, onFilterChange, resetFilters,
                 toggleLines, goToPage, paginationStyle,
-                editMarche, delMarche, newMarche
+                editMarche: editMarcheBridge,
+                delMarche:  delMarcheBridge,
+                newMarche:  newMarcheBridge
             };
         }
     };

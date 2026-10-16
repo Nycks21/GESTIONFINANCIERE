@@ -17,7 +17,7 @@
   </head>
 
   <body class="hold-transition" data-version="<%=AuthHelper.Version %>">
-  <script>document.body.classList.toggle("dark-mode", document.documentElement.classList.contains("dark-mode"));</script>
+    <script>document.body.classList.toggle("dark-mode", document.documentElement.classList.contains("dark-mode"));</script>
     <form id="form1" runat="server">
       <asp:HiddenField ID="hfUserRole" runat="server" />
       <div class="wrapper">
@@ -384,6 +384,10 @@
                 <i class="fas fa-sync-alt"></i>
                 <span data-i18n="button.check_updates">Vérifier les MAJ</span>
               </button>
+              <button type="button" class="btn btn-warning btn-sm" id="btnUpdateDatabase" onclick="updateDatabase()">
+                <i class="fas fa-database"></i>
+                <span data-i18n="button.update_db">Mettre à jour la base</span>
+              </button>
             </div>
             <div style="width:100%;">
               <button type="button" id="btnBackup" class="btn btn-success"
@@ -424,14 +428,35 @@
       <script src="../../_assets/js/i18n.js?v=<%=AuthHelper.Version %>"></script>
       <script src="../../_assets/js/csrf.js?v=<%=AuthHelper.Version %>"></script>
       <script src="../../_assets/js/global.js?v=<%=AuthHelper.Version %>"></script>
+
+      <!-- Scripts applicatifs -->
       <script src="js/config.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/state.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/utils.js?v=<%=AuthHelper.Version %>"></script>
+      <script src="js/permissions.js?v=<%=AuthHelper.Version %>"></script> <!-- ⭐ NOUVEAU — AVANT ui.js et crud.js -->
       <script src="js/ui.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/loaders.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/crud.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/export.js?v=<%=AuthHelper.Version %>"></script>
       <script src="js/init.js?v=<%=AuthHelper.Version %>"></script>
+
+      <!-- ⭐ Filet de sécurité : force l'init de la sidebar si init.js a échoué -->
+      <script>
+        $(function () {
+          setTimeout(function () {
+            var btn = document.getElementById('toggleSidebarBtn');
+            if (btn && !btn.dataset.bound) {
+              btn.dataset.bound = '1';
+              btn.addEventListener('click', function (e) {
+                e.preventDefault();
+                if (typeof openSidebar === 'function') openSidebar();
+              });
+              console.log('🔧 [fallback] Listener sidebar attaché manuellement');
+            }
+          }, 500);
+        });
+      </script>
+
       <div id="toastContainer"></div>
     </form>
   </body>

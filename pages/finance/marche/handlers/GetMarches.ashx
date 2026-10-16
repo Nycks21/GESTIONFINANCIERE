@@ -19,15 +19,31 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
 
         try
         {
+            // ─── Pagination ───
             int page = 1, pageSize = 20;
             int.TryParse(ctx.Request.QueryString["page"], out page);
             int.TryParse(ctx.Request.QueryString["pageSize"], out pageSize);
             if (page < 1) page = 1;
             if (pageSize <= 0 || pageSize > 200) pageSize = 20;
 
+            // ─── Filtres ───
             string search     = (ctx.Request.QueryString["search"] ?? "").Trim();
-            string statut     = (ctx.Request.QueryString["statut"] ?? "").Trim();
+            string statutRaw  = (ctx.Request.QueryString["statut"] ?? "").Trim();
             string typeMarche = (ctx.Request.QueryString["typeMarche"] ?? "").Trim();
+
+            // ⭐ STATUT = TINYINT 1..4 (DDL FMARCHE)
+            byte? statut = null;
+            if (!string.IsNullOrEmpty(statutRaw))
+            {
+                byte s;
+                if (byte.TryParse(statutRaw, out s) && s >= 1 && s <= 4)
+                    statut = s;
+            }
+
+            // ⭐ TYPE_MARCHE = VARCHAR(5) : FRT/TRX/SRV/PIS/ATR
+            var validTypes = new HashSet<string> { "FRT", "TRX", "SRV", "PIS", "ATR" };
+            if (!string.IsNullOrEmpty(typeMarche) && !validTypes.Contains(typeMarche))
+                typeMarche = "";
 
             string connStr = AuthHelper.ConnectionString;
             var marches = new List<Dictionary<string, object>>();
@@ -45,10 +61,10 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
                     whereClause += " AND (m.NUMERO LIKE @search OR m.DESCRIPTION LIKE @search) ";
                     parameters.Add(new SqlParameter("@search", "%" + search + "%"));
                 }
-                if (!string.IsNullOrEmpty(statut))
+                if (statut.HasValue)
                 {
                     whereClause += " AND m.STATUT = @statut ";
-                    parameters.Add(new SqlParameter("@statut", statut));
+                    parameters.Add(new SqlParameter("@statut", statut.Value));
                 }
                 if (!string.IsNullOrEmpty(typeMarche))
                 {
@@ -56,7 +72,7 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
                     parameters.Add(new SqlParameter("@typeMarche", typeMarche));
                 }
 
-                // COUNT
+                // ─── COUNT ───
                 using (SqlCommand cmd = new SqlCommand("SELECT COUNT(*) FROM FMARCHE m " + whereClause, conn))
                 {
                     cmd.Parameters.AddRange(parameters.ToArray());
@@ -64,15 +80,16 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
                     total = (scalar == null || scalar == DBNull.Value) ? 0 : Convert.ToInt32(scalar);
                 }
 
-                // SELECT
+                // ─── SELECT ───
                 string sql = @"
                     SELECT
                         m.ID, m.NUMERO, m.DESCRIPTION, m.COURS_DEVISE,
                         m.TYPE_MARCHE, m.MODE_PASSATION, m.STATUT,
-                        m.DATE_LANCEMENT, m.DATE_SIGNATURE, m.DATE_DEBUT, m.DATE_FIN,
+                        m.DATE_LANCEMENT, m.DATE_OUVERTURE_PLIS, m.DATE_ATTRIBUTION,
+                        m.DATE_SIGNATURE, m.DATE_DEBUT, m.DATE_FIN, m.DELAI_EXECUTION_JOURS,
                         m.MONTANT_LOC_HT, m.MONTANT_LOC_TVA, m.MONTANT_LOC_TTC,
                         m.MONTANT_DEV_HT, m.MONTANT_DEV_TVA, m.MONTANT_DEV_TTC,
-                        m.FOURNISSEUR_ID, m.FOURNISSEUR_NOM,
+                        m.FOURNISSEUR_ID, m.FOURNISSEUR_NOM, m.AUXILIAIRE,
                         s.CODE AS SITE_CODE, s.NOM AS SITE_NOM
                     FROM FMARCHE m
                     LEFT JOIN FSITE s ON s.ID = m.SITE_ID
@@ -91,27 +108,41 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
                         while (r.Read())
                         {
                             var d = new Dictionary<string, object>();
+
                             d["ID"]              = r["ID"].ToString();
                             d["NUMERO"]          = r["NUMERO"].ToString();
-                            d["DESCRIPTION"]     = r["DESCRIPTION"] == DBNull.Value ? "" : r["DESCRIPTION"].ToString();
+                            d["DESCRIPTION"]     = r["DESCRIPTION"]  == DBNull.Value ? "" : r["DESCRIPTION"].ToString();
                             d["COURS_DEVISE"]    = r["COURS_DEVISE"] == DBNull.Value ? 0m : Convert.ToDecimal(r["COURS_DEVISE"]);
-                            d["TYPE_MARCHE"]     = r["TYPE_MARCHE"].ToString();
-                            d["MODE_PASSATION"]  = r["MODE_PASSATION"].ToString();
-                            d["STATUT"]          = r["STATUT"].ToString();
+
+                            // ⭐ Codes courts
+                            d["TYPE_MARCHE"]     = r["TYPE_MARCHE"]    == DBNull.Value ? "FRT" : r["TYPE_MARCHE"].ToString();
+                            d["MODE_PASSATION"]  = r["MODE_PASSATION"] == DBNull.Value ? "AON" : r["MODE_PASSATION"].ToString();
+
+                            // ⭐ STATUT : renvoyé en string ("1".."4") pour aligner sur le <select> HTML
+                            d["STATUT"]          = r["STATUT"] == DBNull.Value ? "1" : r["STATUT"].ToString();
+
                             d["DATE_LANCEMENT"]  = r["DATE_LANCEMENT"]  == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_LANCEMENT"]).ToString("yyyy-MM-dd");
+                            d["DATE_OUVERTURE_PLIS"] = r["DATE_OUVERTURE_PLIS"] == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_OUVERTURE_PLIS"]).ToString("yyyy-MM-dd");
+                            d["DATE_ATTRIBUTION"]    = r["DATE_ATTRIBUTION"]    == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_ATTRIBUTION"]).ToString("yyyy-MM-dd");
                             d["DATE_SIGNATURE"]  = r["DATE_SIGNATURE"]  == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_SIGNATURE"]).ToString("yyyy-MM-dd");
                             d["DATE_DEBUT"]      = r["DATE_DEBUT"]      == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_DEBUT"]).ToString("yyyy-MM-dd");
                             d["DATE_FIN"]        = r["DATE_FIN"]        == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_FIN"]).ToString("yyyy-MM-dd");
+                            d["DELAI_EXECUTION_JOURS"] = r["DELAI_EXECUTION_JOURS"] == DBNull.Value ? (object)null : Convert.ToInt32(r["DELAI_EXECUTION_JOURS"]);
+
                             d["MONTANT_LOC_HT"]  = Convert.ToDecimal(r["MONTANT_LOC_HT"]);
                             d["MONTANT_LOC_TVA"] = Convert.ToDecimal(r["MONTANT_LOC_TVA"]);
                             d["MONTANT_LOC_TTC"] = Convert.ToDecimal(r["MONTANT_LOC_TTC"]);
                             d["MONTANT_DEV_HT"]  = Convert.ToDecimal(r["MONTANT_DEV_HT"]);
                             d["MONTANT_DEV_TVA"] = Convert.ToDecimal(r["MONTANT_DEV_TVA"]);
                             d["MONTANT_DEV_TTC"] = Convert.ToDecimal(r["MONTANT_DEV_TTC"]);
+
                             d["FOURNISSEUR_ID"]  = r["FOURNISSEUR_ID"]  == DBNull.Value ? null : r["FOURNISSEUR_ID"].ToString();
                             d["FOURNISSEUR_NOM"] = r["FOURNISSEUR_NOM"] == DBNull.Value ? "" : r["FOURNISSEUR_NOM"].ToString();
-                            d["SITE_CODE"]       = r["SITE_CODE"]       == DBNull.Value ? "" : r["SITE_CODE"].ToString();
-                            d["SITE_NOM"]        = r["SITE_NOM"]        == DBNull.Value ? "" : r["SITE_NOM"].ToString();
+                            d["AUXILIAIRE"]      = r["AUXILIAIRE"]      == DBNull.Value ? "" : r["AUXILIAIRE"].ToString();
+
+                            d["SITE_CODE"]       = r["SITE_CODE"] == DBNull.Value ? "" : r["SITE_CODE"].ToString();
+                            d["SITE_NOM"]        = r["SITE_NOM"]  == DBNull.Value ? "" : r["SITE_NOM"].ToString();
+
                             marches.Add(d);
                         }
                     }
@@ -121,9 +152,12 @@ public class GetMarches : IHttpHandler, IRequiresSessionState
             int totalPages = (int)Math.Ceiling((double)total / pageSize);
             ctx.Response.Write(new JavaScriptSerializer().Serialize(new
             {
-                success = true, marches = marches,
-                total = total, totalPages = totalPages,
-                page = page, pageSize = pageSize
+                success = true,
+                marches = marches,
+                total = total,
+                totalPages = totalPages,
+                page = page,
+                pageSize = pageSize
             }));
         }
         catch (Exception ex)

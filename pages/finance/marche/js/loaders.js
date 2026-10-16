@@ -1,233 +1,224 @@
-// loaders.js — SAISIE (orchestrateur + options auxiliaire + expansion lignes + Vue bridge)
+// loaders.js — MARCHE (version robuste)
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
+
+// ============================================================
+// FETCH JSON ROBUSTE — détecte tout type de réponse anormale
+// ============================================================
+async function _fetchJson(url, label) {
+    var resp;
+    try {
+        resp = await fetch(url);
+    } catch (netErr) {
+        throw new Error((label || 'Requête') + ' : impossible de joindre le serveur (' + netErr.message + ')');
+    }
+
+    var ct   = (resp.headers.get('content-type') || '').toLowerCase();
+    var text = await resp.text();
+
+    // 1. Statut HTTP anormal
+    if (!resp.ok) {
+        var preview = text.substring(0, 200).replace(/\s+/g, ' ');
+        throw new Error(
+            (label || 'Requête') + ' : HTTP ' + resp.status + ' — ' + preview
+        );
+    }
+
+    // 2. Réponse HTML au lieu de JSON
+    if (text.trim().charAt(0) === '<') {
+        var preview2 = text.substring(0, 200).replace(/\s+/g, ' ');
+        throw new Error(
+            (label || 'Requête') + ' : réponse HTML reçue (session expirée ou erreur serveur). Extrait : ' + preview2
+        );
+    }
+
+    // 3. Parse JSON
+    try {
+        return JSON.parse(text);
+    } catch (e) {
+        throw new Error((label || 'Requête') + ' : JSON invalide — ' + e.message);
+    }
+}
 
 // ============================================================
 // CHARGEMENT DES LOOKUPS
 // ============================================================
 async function loadLookups() {
     try {
-        var url = API.BASE + API.HANDLERS_PATH + API.LOOKUPS;
-        var resp = await fetch(url);
-        var data = await resp.json();
+        var url  = API.BASE + API.HANDLERS_PATH + API.LOOKUPS;
+        var data = await _fetchJson(url, 'GetMarcheLookups');
 
         if (!data.success) {
             console.warn('[loadLookups] Réponse non OK :', data.message);
-            return;
+            if (typeof showErrorToast === 'function')
+                showErrorToast(data.message || 'Erreur lookups');
+            return false;
         }
 
-        AppState.sites              = data.sites              || [];
-        AppState.journaux           = data.journaux           || [];
-        AppState.exercices          = data.exercices          || [];
-        AppState.monnaies           = data.monnaies           || [];
-        AppState.plansActifs        = data.plansActifs        || [];
-        AppState.sourcesFinancement = data.sourcesFinancement || [];
-        AppState.modes              = data.modes              || [];
-        AppState.tiers              = data.tiers              || [];
+        // ─── Remplissage AppState ───
+        AppState.sites         = data.sites         || [];
+        AppState.fournisseurs  = data.fournisseurs  || [];
+        AppState.articles      = data.articles      || [];
+        AppState.monnaies      = data.monnaies      || [];
+        AppState.plansActifs   = data.plansActifs   || [];
+        AppState.marcheLinesCache = AppState.marcheLinesCache || {};
+        AppState.expandedMarches  = AppState.expandedMarches  || {};
 
-        AppState.ecritureLinesCache = AppState.ecritureLinesCache || {};
-        AppState.expandedEcritures  = AppState.expandedEcritures  || {};
-
+        // ─── Remplissage des selects ───
         populateHeaderSelects();
-        populateAuxiliaireOptions();
-        renderFormPlanFields();
-        renderGridHead();
 
-        // ⭐ Sync des journaux dans Vue si présent
-        if (window._VueSaisieList && typeof window._VueSaisieList.syncJournaux === 'function') {
-            window._VueSaisieList.syncJournaux();
+        // ⭐ marAuxi vide tant qu'aucun fournisseur (règle métier)
+        populateMarAuxiOptions(null, false);
+
+        renderFormPlanFields();
+
+        // ─── Diagnostic lisible ───
+        var missing = [];
+        if (!AppState.fournisseurs.length) missing.push('FOURNISSEURS (PLAN1)');
+        if (!AppState.articles.length)     missing.push('ARTICLES (MARTICLE)');
+        if (!AppState.monnaies.length)     missing.push('MONNAIES (FMONNAIE)');
+
+        console.log('[loadLookups] ✅',
+            '| sites='        + AppState.sites.length,
+            '| fournisseurs=' + AppState.fournisseurs.length,
+            '| articles='     + AppState.articles.length,
+            '| monnaies='     + AppState.monnaies.length,
+            '| plans='        + AppState.plansActifs.length);
+
+        if (missing.length) {
+            console.warn('[loadLookups] ⚠️ Tables vides :', missing.join(', '),
+                         '→ insérez des données de test (voir SEED MYSET)');
         }
+
+        return true;
     } catch (err) {
-        console.error('[loadLookups] Erreur :', err);
+        console.error('[loadLookups] ❌', err.message || err);
+        if (typeof showErrorToast === 'function')
+            showErrorToast(err.message || 'Erreur lors du chargement des référentiels.');
+        return false;
     }
 }
 
 // ============================================================
 // PEUPLEMENT DES SELECTS D'ENTÊTE
-//   ⭐ Le select #journal-filter est ignoré si Vue est présent
-//      (Vue le gère via v-for).
 // ============================================================
 function populateHeaderSelects() {
-    // Sites
-    var s = document.getElementById('ecrSite');
-    if (s) {
-        s.innerHTML = '<option value="">—</option>';
-        AppState.sites.forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.ID;
-            o.textContent = x.CODE + ' — ' + x.NOM;
-            s.appendChild(o);
-        });
-    }
+    _fillSelect('marSite',        AppState.sites,        'ID', '—');
+    _fillSelect('marFournisseur', AppState.fournisseurs, 'ID', '—');
+    _fillSelect('mlArticle',      AppState.articles,     'ID', '—');
+}
 
-    // Journaux (edit panel)
-    var j = document.getElementById('ecrJournal');
-    if (j) {
-        j.innerHTML = '<option value="">—</option>';
-        AppState.journaux.forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.ID;
-            o.textContent = x.CODE + ' — ' + x.LIBELLE;
-            o.setAttribute('data-categorie', x.CATEGORIE_JOURNAL);
-            j.appendChild(o);
-        });
-    }
+function _fillSelect(selectId, arr, valueKey, placeholder) {
+    var sel = document.getElementById(selectId);
+    if (!sel) return;
 
-    // ⭐ Journal filter (LIST) — SKIP si Vue gère
-    if (!window._VueSaisieList) {
-        var jf = document.getElementById('journal-filter');
-        if (jf) {
-            jf.innerHTML = '<option value="">' + _t('saisie.filter.all_journals') + '</option>';
-            AppState.journaux.forEach(function (x) {
-                var o = document.createElement('option');
-                o.value = x.ID;
-                o.textContent = x.CODE;
-                jf.appendChild(o);
-            });
-        }
-    }
+    sel.innerHTML = '';
+    var o0 = document.createElement('option');
+    o0.value = '';
+    o0.textContent = placeholder || '—';
+    sel.appendChild(o0);
 
-    // Exercices
-    var e = document.getElementById('ecrExercice');
-    if (e) {
-        e.innerHTML = '<option value="">—</option>';
-        AppState.exercices.forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.ID;
-            o.textContent = x.CODE;
-            e.appendChild(o);
-        });
-        if (AppState.exercices.length === 1) {
-            e.value = AppState.exercices[0].ID;
-            loadPeriodes(AppState.exercices[0].ID);
-        }
-    }
-
-    // Monnaies
-    var m = document.getElementById('ecrDevise');
-    if (m) {
-        m.innerHTML = '<option value="">—</option>';
-        AppState.monnaies.forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.ID;
-            o.textContent = x.CODE;
-            if (x.EST_REFERENCE) o.selected = true;
-            m.appendChild(o);
-        });
-    }
-
-    // Modes
-    var mo = document.getElementById('flMode');
-    if (mo) {
-        mo.innerHTML = '<option value="">—</option>';
-        (AppState.modes || []).forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.CODE;
-            o.textContent = x.LIBELLE;
-            mo.appendChild(o);
-        });
-    }
-
-    // Subvention
-    var sb = document.getElementById('flSub');
-    if (sb) {
-        sb.innerHTML = '<option value="">—</option>';
-        (AppState.sourcesFinancement || []).forEach(function (x) {
-            var o = document.createElement('option');
-            o.value = x.CODE;
-            o.textContent = x.LIBELLE;
-            sb.appendChild(o);
-        });
-    }
+    (arr || []).forEach(function (x) {
+        var o = document.createElement('option');
+        o.value = x[valueKey] || '';
+        o.textContent = ((x.CODE || '') + ' — ' + (x.NOM || '')).replace(/^ — | — $/g, '');
+        sel.appendChild(o);
+    });
 }
 
 // ============================================================
-// PEUPLEMENT DU <select id="flAux"> DEPUIS FTIERS
+// AUXILIAIRES — Chargement dynamique par fournisseur
 // ============================================================
-function populateAuxiliaireOptions(filterByPlanElementId, preserveValue) {
-    var sel = document.getElementById('flAux');
+var _auxFetchToken = 0;
+
+async function populateMarAuxiOptions(filterByFournisseurId, preserveValue) {
+    var sel  = document.getElementById('marAuxi');
+    var hint = document.getElementById('marAuxHint');
     if (!sel) return;
 
     var currentVal = preserveValue ? sel.value : '';
-    sel.innerHTML = '<option value="">—</option>';
+    var token = ++_auxFetchToken;
 
-    var allTiers = AppState.tiers || [];
-    var tiers = allTiers;
-    var isFiltered = false;
-
-    if (filterByPlanElementId) {
-        var filtered = allTiers.filter(function (t) {
-            return t.PLAN_ELEMENT_ID === filterByPlanElementId;
-        });
-        if (filtered.length) {
-            tiers = filtered;
-            isFiltered = true;
-        }
+    // Cas 1 : aucun fournisseur → vide
+    if (!filterByFournisseurId) {
+        sel.innerHTML = '<option value="">—</option>';
+        sel.value = '';
+        sel.disabled = true;
+        sel.setAttribute('data-count', '0');
+        sel.setAttribute('data-filtered', '0');
+        _setAuxHint(hint, 'marche.hint.aux_initial', 'info');
+        return;
     }
 
-    tiers.forEach(function (t) {
-        var o = document.createElement('option');
-        o.value = t.CODE;
-        o.textContent = t.CODE + ' — ' + t.NOM;
-        o.setAttribute('data-tiers-id', t.ID);
-        o.setAttribute('data-type-tiers', t.TYPE_TIERS || '');
-        if (t.PLAN_ORDER != null) {
-            o.setAttribute('data-plan-order', t.PLAN_ORDER);
-        }
-        sel.appendChild(o);
-    });
-
-    if (currentVal) {
-        sel.value = currentVal;
-        if (sel.value !== currentVal) {
-            var opt = document.createElement('option');
-            opt.value = currentVal;
-            opt.textContent = currentVal + ' (' + _t('saisie.hint.out_of_filter') + ')';
-            sel.appendChild(opt);
-            sel.value = currentVal;
-        }
-    }
-
-    sel.setAttribute('data-filtered', isFiltered ? '1' : '0');
-    sel.setAttribute('data-count', tiers.length);
-}
-
-// ============================================================
-// PÉRIODES
-// ============================================================
-async function loadPeriodes(exerciceId) {
-    AppState.periodes = [];
-    if (!exerciceId) return;
+    // Cas 2 : chargement
+    sel.disabled = true;
+    sel.innerHTML = '<option value="">' + (_t('common.loading') || 'Chargement…') + '</option>';
+    _setAuxHint(hint, 'marche.hint.aux_loading', 'info');
 
     try {
-        var url = API.BASE + API.HANDLERS_PATH + API.PERIODES
-                + '?exerciceId=' + encodeURIComponent(exerciceId);
-        var resp = await fetch(url);
-        var data = await resp.json();
-        if (data.success) {
-            AppState.periodes = data.periodes || [];
+        var url  = API.BASE + API.HANDLERS_PATH + API.AUX_BY_FOURNISSEUR
+                 + '?fournisseurId=' + encodeURIComponent(filterByFournisseurId);
+        var data = await _fetchJson(url, 'GetAuxiliairesByFournisseur');
+
+        if (token !== _auxFetchToken) return;   // réponse obsolète
+
+        if (!data.success) {
+            _fillAuxSelect(sel, [], '');
+            sel.disabled = false;
+            sel.setAttribute('data-count', '0');
+            sel.setAttribute('data-filtered', '1');
+            _setAuxHint(hint, 'marche.hint.aux_error', 'error');
+            console.error('[populateMarAuxiOptions]', data.message || 'Réponse invalide.');
+            return;
         }
+
+        var auxiliaires = data.auxiliaires || [];
+        _fillAuxSelect(sel, auxiliaires, currentVal);
+        sel.disabled = false;
+        sel.setAttribute('data-count', auxiliaires.length);
+
+        if (auxiliaires.length === 0) {
+            _setAuxHint(hint, 'marche.hint.aux_empty', 'warning');
+            return;
+        }
+        if (auxiliaires.length === 1) {
+            sel.value = auxiliaires[0].CODE;
+        }
+        _setAuxHint(hint, 'marche.hint.aux_filtered', 'success');
+
     } catch (err) {
-        console.error('[loadPeriodes]', err);
+        if (token !== _auxFetchToken) return;
+        _fillAuxSelect(sel, [], '');
+        sel.disabled = false;
+        sel.setAttribute('data-count', '0');
+        sel.setAttribute('data-filtered', '1');
+        _setAuxHint(hint, 'marche.hint.aux_error', 'error');
+        console.error('[populateMarAuxiOptions]', err.message || err);
     }
 }
 
-function findPeriodeId(dateStr) {
-    if (!dateStr) return '';
-    var d = dateStr.substring(0, 10);
-
-    if (AppState.periodes && AppState.periodes.length) {
-        for (var i = 0; i < AppState.periodes.length; i++) {
-            var p = AppState.periodes[i];
-            var debut = (p.DATE_DEBUT || '').substring(0, 10);
-            var fin   = (p.DATE_FIN   || '').substring(0, 10);
-            if (d >= debut && d <= fin) return p.ID;
-        }
+function _fillAuxSelect(sel, auxiliaires, currentVal) {
+    sel.innerHTML = '<option value="">—</option>';
+    (auxiliaires || []).forEach(function (t) {
+        var o = document.createElement('option');
+        o.value = t.CODE;
+        o.textContent = (t.CODE || '') + ' — ' + (t.NOM || '');
+        o.setAttribute('data-tiers-id', t.ID || '');
+        if (t.TYPE_TIERS)      o.setAttribute('data-type-tiers', t.TYPE_TIERS);
+        if (t.PLAN_ELEMENT_ID) o.setAttribute('data-plan-element-id', t.PLAN_ELEMENT_ID);
+        sel.appendChild(o);
+    });
+    if (currentVal) {
+        sel.value = currentVal;
+        if (sel.value !== currentVal) sel.value = '';
     }
+}
 
-    var exerciceId = _getVal('ecrExercice');
-    if (exerciceId) return exerciceId;
-    return '';
+function _setAuxHint(el, key, type) {
+    if (!el) return;
+    el.textContent = _t(key) || '';
+    el.setAttribute('data-hint-type', type || 'info');
+    el.setAttribute('data-hint-key', key);
 }
 
 // ============================================================
@@ -236,15 +227,14 @@ function findPeriodeId(dateStr) {
 async function loadComptesByPlan(ordre) {
     if (AppState.comptesParPlan[ordre]) return AppState.comptesParPlan[ordre];
     try {
-        var url = API.BASE + API.HANDLERS_PATH + API.COMPTES_BY_PLAN + '?planOrder=' + ordre;
-        var resp = await fetch(url);
-        var data = await resp.json();
+        var url  = API.BASE + API.HANDLERS_PATH + API.COMPTES_BY_PLAN + '?planOrder=' + ordre;
+        var data = await _fetchJson(url, 'GetComptesByPlan(' + ordre + ')');
         if (data.success) {
             AppState.comptesParPlan[ordre] = data.comptes || [];
             return data.comptes || [];
         }
     } catch (err) {
-        console.error('[loadComptesByPlan ' + ordre + ']', err);
+        console.error('[loadComptesByPlan ' + ordre + ']', err.message || err);
     }
     return [];
 }
@@ -252,14 +242,10 @@ async function loadComptesByPlan(ordre) {
 async function loadAllComptesActifs() {
     var active = getActivePlanFields();
     if (!active.length) return;
-    var promises = active.map(function (p) { return loadComptesByPlan(p.ordre); });
-    await Promise.all(promises);
+    await Promise.all(active.map(function (p) { return loadComptesByPlan(p.ordre); }));
     populatePlanSelectsForm();
 }
 
-// ============================================================
-// RÉSOLUTION D'UN CODE COMPTE
-// ============================================================
 function resolvePlanCodeByOrdre(ordre, compteId) {
     if (!compteId) return '';
     var arr = AppState.comptesParPlan[ordre] || [];
@@ -270,338 +256,44 @@ function resolvePlanCodeByOrdre(ordre, compteId) {
 }
 
 // ============================================================
-// ÉCRITURES — LISTE (Bridge Vue / Fallback vanilla)
+// MARCHÉS — LISTE
 // ============================================================
-var ecrituresListRequestId = 0;
-
-async function loadEcritures(opts) {
+async function loadMarches(opts) {
     opts = opts || {};
-    var silent = !!opts.silent;
-
-    // ⭐ Si Vue est présent, déléguer
-    if (window._VueSaisieList && typeof window._VueSaisieList.load === 'function') {
-        if (!silent) showSpinner();
-        try {
-            await window._VueSaisieList.load();
-        } finally {
-            if (!silent) hideSpinner();
-        }
-        return;
+    if (window._VueMarcheList && typeof window._VueMarcheList.load === 'function') {
+        if (!opts.silent) showSpinner();
+        try { await window._VueMarcheList.load(); }
+        finally { if (!opts.silent) hideSpinner(); }
     }
+}
 
-    // ─── Fallback vanilla ───
-    var requestId = ++ecrituresListRequestId;
-    if (!silent) showSpinner();
-
-    AppState.expandedEcritures = {};
-
+// ============================================================
+// PÉRIODES
+// ============================================================
+async function loadPeriodes(exerciceId) {
+    AppState.periodes = [];
+    if (!exerciceId) return;
     try {
-        var params = new URLSearchParams({
-            page:      AppState.page,
-            pageSize:  AppState.pageSize,
-            search:    AppState.filters.search,
-            journalId: AppState.filters.journalId || '',
-            statut:    AppState.filters.statut    || ''
-        });
-        var url = API.BASE + API.HANDLERS_PATH + API.LIST + '?' + params;
-        var resp = await fetch(url);
-        var data = await resp.json();
-
-        if (requestId !== ecrituresListRequestId) return;
-        if (!resp.ok) throw new Error(data.message || _t('saisie.msg.load_error'));
-
-        if (data.success) {
-            AppState.ecritures  = data.ecritures || [];
-            AppState.total      = Number(data.total || 0);
-            AppState.totalPages = Number(data.totalPages || 0);
-            if (AppState.page < 1) AppState.page = 1;
-            if (AppState.totalPages > 0 && AppState.page > AppState.totalPages) {
-                AppState.page = AppState.totalPages;
-                await loadEcritures({ silent: silent });
-                return;
-            }
-            renderEcrituresList();
-            createPaginationControls(AppState.totalPages);
-
-            var c = document.getElementById('resultsCounter');
-            if (c) c.textContent = AppState.total + ' ' + _t('saisie.counter_unit');
-        } else {
-            showEcrituresListError();
-            showErrorToast(data.message || _t('message.error'));
-        }
+        var url  = API.BASE + API.HANDLERS_PATH + API.PERIODES
+                 + '?exerciceId=' + encodeURIComponent(exerciceId);
+        var data = await _fetchJson(url, 'GetPeriodes');
+        if (data.success) AppState.periodes = data.periodes || [];
     } catch (err) {
-        if (requestId !== ecrituresListRequestId) return;
-        showEcrituresListError();
-        showErrorToast(err.message);
-    } finally {
-        if (requestId === ecrituresListRequestId) hideSpinner();
+        console.error('[loadPeriodes]', err.message || err);
     }
 }
 
-function showEcrituresListError() {
-    AppState.ecritures = [];
-    AppState.total = 0;
-    AppState.totalPages = 0;
-
-    var tb = document.getElementById('ecrituresBody');
-    if (tb) {
-        tb.innerHTML = '<tr><td colspan="12" class="table-empty">'
-            + escapeHtml(_t('saisie.msg.load_error')) + '</td></tr>';
-    }
-
-    var pagination = document.getElementById('paginationWrapper');
-    if (pagination) pagination.innerHTML = '';
-    var counter = document.getElementById('resultsCounter');
-    if (counter) counter.textContent = '0 ' + _t('saisie.counter_unit');
-}
-
-// ============================================================
-// RENDU DE LA LISTE (fallback vanilla — no-op si Vue)
-// ============================================================
-function renderEcrituresList() {
-    // ⭐ Si Vue est présent, il gère déjà le rendu
-    if (window._VueSaisieList) return;
-
-    var tb = document.getElementById('ecrituresBody');
-    if (!tb) return;
-
-    if (!AppState.ecritures.length) {
-        tb.innerHTML = '<tr><td colspan="12" class="table-empty">'
-            + '<i class="fas fa-inbox"></i>'
-            + '<span>' + _t('saisie.msg.no_data') + '</span></td></tr>';
-        return;
-    }
-
-    var html = '';
-    AppState.ecritures.forEach(function (e) {
-        var sc = 'statut-' + (e.STATUT || 'brouillon').toLowerCase();
-        var isExpanded = !!AppState.expandedEcritures[e.ID];
-        var chevron = isExpanded
-            ? '<i class="fas fa-chevron-down"></i>'
-            : '<i class="fas fa-chevron-right"></i>';
-
-        var statutLabel = _t('saisie.statut.' + (e.STATUT || 'BROUILLON')) || e.STATUT;
-
-        var datePiece = e.DATE_PIECE || '';
-        var totalDebitRap = parseFloat(e.TOTAL_DEBIT_RAP || 0) || 0;
-        var totalCreditRap = parseFloat(e.TOTAL_CREDIT_RAP || 0) || 0;
-
-        html += '<tr class="ecr-main-row" data-id="' + e.ID + '">'
-            + '<td style="text-align:center;">'
-            +   '<button type="button" class="btn-toggle-ecr" '
-            +     'data-toggle-ecr="' + e.ID + '" '
-            +     'onclick="toggleEcritureLines(\'' + e.ID + '\', event)" '
-            +     'title="' + _t('saisie.action.toggle_lines') + '"'
-            +     'style="background:none;border:none;cursor:pointer;color:#007bff;padding:4px 8px;">'
-            +     chevron + '</button>'
-            + '</td>'
-            + '<td><span class="badge-code">' + escapeHtml(e.REFERENCE || '—') + '</span></td>'
-            + '<td>' + (datePiece ? escapeHtml(datePiece) : '<span class="cell-empty">—</span>') + '</td>'
-            + '<td>' + escapeHtml(e.DATE_COMPTABLE || '') + '</td>'
-            + '<td><span class="badge-journal">' + escapeHtml(e.JOURNAL_CODE || '?') + '</span></td>'
-            + '<td>' + escapeHtml(e.LIBELLE || '') + '</td>'
-            + '<td style="text-align:right;font-family:monospace;color:#B91C1C;">' + formatMontant(e.TOTAL_DEBIT) + '</td>'
-            + '<td style="text-align:right;font-family:monospace;color:#047857;">' + formatMontant(e.TOTAL_CREDIT) + '</td>'
-            + '<td style="text-align:right;font-family:monospace;color:#B91C1C;">'
-            +     (totalDebitRap > 0 ? formatMontant(totalDebitRap) : '<span class="cell-empty">0,00</span>')
-            + '</td>'
-            + '<td style="text-align:right;font-family:monospace;color:#047857;">'
-            +     (totalCreditRap > 0 ? formatMontant(totalCreditRap) : '<span class="cell-empty">0,00</span>')
-            + '</td>'
-            + '<td style="text-align:center;"><span class="badge-statut ' + sc + '">' + escapeHtml(statutLabel) + '</span></td>'
-            + '<td style="text-align:right;">'
-            +   '<button type="button" class="btn btn-sm btn-primary" onclick="editEcriture(\'' + e.ID + '\')" title="' + _t('button.edit') + '"><i class="fas fa-edit"></i></button> '
-            +   '<button type="button" class="btn btn-sm btn-danger" onclick="deleteEcriture(\'' + e.ID + '\')" title="' + _t('button.delete') + '"><i class="fas fa-trash"></i></button>'
-            + '</td>'
-            + '</tr>';
-
-        if (isExpanded && AppState.ecritureLinesCache[e.ID]) {
-            html += buildEcritureLinesRow(e.ID, AppState.ecritureLinesCache[e.ID]);
-        }
-    });
-    tb.innerHTML = html;
-}
-
-// ============================================================
-// CONSTRUCTION DE LA SOUS-LIGNE (fallback vanilla)
-// ============================================================
-function buildEcritureLinesRow(ecritureId, lignes) {
-    var plans = getActivePlanFields();
-
-    var headHtml = '<th style="width:36px;">#</th>';
-    headHtml += '<th style="width:90px;">' + _t('saisie.col.auxiliaire') + '</th>';
-    plans.forEach(function (p) {
-        headHtml += '<th style="width:90px;">' + escapeHtml(p.label) + '</th>';
-    });
-    headHtml += '<th>' + _t('saisie.col.libelle') + '</th>';
-    headHtml += '<th style="width:110px;text-align:right;">' + _t('saisie.col.debit')      + '</th>';
-    headHtml += '<th style="width:110px;text-align:right;">' + _t('saisie.col.credit')     + '</th>';
-    headHtml += '<th style="width:110px;text-align:right;">' + _t('saisie.col.debit_rap')  + '</th>';
-    headHtml += '<th style="width:110px;text-align:right;">' + _t('saisie.col.credit_rap') + '</th>';
-
-    var totalCols = 2 + plans.length + 5;
-
-    var bodyHtml = '';
-    if (!lignes || !lignes.length) {
-        bodyHtml = '<tr><td colspan="' + totalCols + '" '
-            + 'style="text-align:center;padding:16px;color:#94A3B8;font-style:italic;">'
-            + _t('saisie.msg.no_lines_entry') + '</td></tr>';
-    } else {
-        lignes.forEach(function (l, i) {
-            var debit  = parseFloat(l.DEBIT  || 0);
-            var credit = parseFloat(l.CREDIT || 0);
-
-            var montantDevise = parseFloat(l.MONTANT_DEVISE || 0) || 0;
-            var sens = l.SENS || (debit > 0 ? 'D' : (credit > 0 ? 'C' : null));
-
-            var debitRap  = (sens === 'D') ? montantDevise : 0;
-            var creditRap = (sens === 'C') ? montantDevise : 0;
-
-            bodyHtml += '<tr style="border-bottom:1px solid #e9ecef;">';
-            bodyHtml += '<td style="text-align:center;color:#94A3B8;">' + (i + 1) + '</td>';
-            // ⭐ Utilisation de \u2014 pour "—"
-            bodyHtml += '<td>' + escapeHtml(l.AUXILIAIRE || '\u2014') + '</td>';
-
-            plans.forEach(function (p) {
-                var val = l['PLAN' + p.ordre];
-                var code = val ? resolvePlanCodeByOrdre(p.ordre, val) : '';
-                // ⭐ Utilisation de \u2014
-                bodyHtml += '<td><span class="cell-badge" title="' + escapeHtml(code) + '">'
-                          + (escapeHtml(code) || '\u2014') + '</span></td>';
-            });
-
-            bodyHtml += '<td>' + escapeHtml(l.LIBELLE || '') + '</td>';
-            bodyHtml += '<td style="text-align:right;font-family:monospace;color:#B91C1C;">'
-                      + (debit  > 0 ? formatMontant(debit)  : '') + '</td>';
-            bodyHtml += '<td style="text-align:right;font-family:monospace;color:#047857;">'
-                      + (credit > 0 ? formatMontant(credit) : '') + '</td>';
-            bodyHtml += '<td style="text-align:right;font-family:monospace;color:#B91C1C;">'
-                      + (debitRap  > 0 ? formatMontant(debitRap)  : '') + '</td>';
-            bodyHtml += '<td style="text-align:right;font-family:monospace;color:#047857;">'
-                      + (creditRap > 0 ? formatMontant(creditRap) : '') + '</td>';
-            bodyHtml += '</tr>';
-        });
-    }
-
-    var sumDebitRap = lignes.reduce(function (s, x) {
-        var d = parseFloat(x.DEBIT || 0);
-        var sens = x.SENS || (d > 0 ? 'D' : null);
-        return s + (sens === 'D' ? (parseFloat(x.MONTANT_DEVISE || 0) || 0) : 0);
-    }, 0);
-    var sumCreditRap = lignes.reduce(function (s, x) {
-        var c = parseFloat(x.CREDIT || 0);
-        var sens = x.SENS || (c > 0 ? 'C' : null);
-        return s + (sens === 'C' ? (parseFloat(x.MONTANT_DEVISE || 0) || 0) : 0);
-    }, 0);
-
-    // ⭐ \u2014 = — , \u00B7 = ·
-    var summaryHtml = '<div style="margin-top:8px;font-size:11px;color:#6c757d;">'
-        + lignes.length + ' ' + _t('saisie.lines_count_unit') + ' \u2014 '
-        + _t('saisie.col.debit') + ' : '
-        + '<strong style="color:#B91C1C;">'
-        + formatMontant(lignes.reduce(function (s, x) { return s + parseFloat(x.DEBIT || 0); }, 0))
-        + '</strong> \u2014 ' + _t('saisie.col.credit') + ' : '
-        + '<strong style="color:#047857;">'
-        + formatMontant(lignes.reduce(function (s, x) { return s + parseFloat(x.CREDIT || 0); }, 0))
-        + '</strong>'
-        + ' &nbsp;\u00B7&nbsp; '
-        + _t('saisie.col.debit_rap') + ' : '
-        + '<strong style="color:#B91C1C;">' + formatMontant(sumDebitRap) + '</strong>'
-        + ' \u2014 ' + _t('saisie.col.credit_rap') + ' : '
-        + '<strong style="color:#047857;">' + formatMontant(sumCreditRap) + '</strong>'
-        + '</div>';
-
-    return '<tr class="ecr-sub-row" data-ecriture-id="' + ecritureId + '">'
-        +   '<td colspan="12" style="padding:0;background:#f8f9fa;border-bottom:2px solid #dee2e6;">'
-        +     '<div style="padding:10px 20px 14px;">'
-        +       '<table style="width:100%;font-size:12px;border-collapse:collapse;">'
-        +         '<thead><tr style="background:#e9ecef;color:#495057;font-size:11px;text-transform:uppercase;letter-spacing:.5px;">'
-        +           headHtml
-        +         '</tr></thead>'
-        +         '<tbody>' + bodyHtml + '</tbody>'
-        +       '</table>'
-        +       summaryHtml
-        +     '</div>'
-        +   '</td>'
-        + '</tr>';
-}
-
-// ============================================================
-// EXPANSION / RÉDUCTION D'UNE ÉCRITURE (Bridge Vue)
-// ============================================================
-async function toggleEcritureLines(ecritureId, e) {
-    if (e) e.stopPropagation();
-
-    // ⭐ Si Vue est présent, déléguer
-    if (window._VueSaisieList && typeof window._VueSaisieList.toggleLines === 'function') {
-        window._VueSaisieList.toggleLines(ecritureId);
-        return;
-    }
-
-    // ─── Fallback vanilla ───
-    var btn = document.querySelector('button[data-toggle-ecr="' + escritureIdSafe(ecritureId) + '"]');
-    var existingSub = document.querySelector('tr.ecr-sub-row[data-ecriture-id="' + escritureIdSafe(ecritureId) + '"]');
-
-    if (existingSub && AppState.expandedEcritures[ecritureId]) {
-        AppState.expandedEcritures[ecritureId] = false;
-        existingSub.remove();
-        if (btn) btn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-        return;
-    }
-
-    AppState.expandedEcritures[ecritureId] = true;
-    if (btn) btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i>';
-
-    var lignes = AppState.ecritureLinesCache[ecritureId];
-
-    if (!lignes) {
-        try {
-            var url = API.BASE + API.HANDLERS_PATH + API.DETAIL + '?id=' + encodeURIComponent(ecritureId);
-            var resp = await fetch(url);
-            var data = await resp.json();
-            if (!data.success) {
-                showErrorToast(data.message || _t('saisie.msg.load_error'));
-                AppState.expandedEcritures[ecritureId] = false;
-                if (btn) btn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-                return;
-            }
-            lignes = data.lignes || [];
-            AppState.ecritureLinesCache[ecritureId] = lignes;
-        } catch (err) {
-            showErrorToast(err.message);
-            AppState.expandedEcritures[ecritureId] = false;
-            if (btn) btn.innerHTML = '<i class="fas fa-chevron-right"></i>';
-            return;
+function findPeriodeId(dateStr) {
+    if (!dateStr) return '';
+    var d = dateStr.substring(0, 10);
+    if (AppState.periodes && AppState.periodes.length) {
+        for (var i = 0; i < AppState.periodes.length; i++) {
+            var p = AppState.periodes[i];
+            if (d >= (p.DATE_DEBUT || '').substring(0, 10)
+                && d <= (p.DATE_FIN || '').substring(0, 10)) return p.ID;
         }
     }
-
-    var mainRow = document.querySelector('tr.ecr-main-row[data-id="' + escritureIdSafe(ecritureId) + '"]');
-    if (mainRow) {
-        var tmp = document.createElement('tbody');
-        tmp.innerHTML = buildEcritureLinesRow(ecritureId, lignes);
-        mainRow.parentNode.insertBefore(tmp.firstChild, mainRow.nextSibling);
-    }
-
-    if (btn) btn.innerHTML = '<i class="fas fa-chevron-down"></i>';
-}
-
-function escritureIdSafe(id) {
-    return String(id || '').replace(/[^a-zA-Z0-9\-]/g, '');
-}
-
-// ============================================================
-// COMPTEUR DE LIGNES (dans la grille de saisie)
-// ============================================================
-function _refreshLinesCounter() {
-    var el = document.getElementById('ecrLinesCounter');
-    if (!el) return;
-    var n = (AppState && AppState.lignes) ? AppState.lignes.length : 0;
-    if (n > 0) {
-        el.textContent = '(' + n + ' ' + _t('saisie.lines_count_unit') + ')';
-        el.style.display = 'inline-block';
-    } else {
-        el.style.display = 'none';
-    }
+    return '';
 }
 
 // ============================================================
@@ -609,14 +301,40 @@ function _refreshLinesCounter() {
 // ============================================================
 window.loadLookups               = loadLookups;
 window.populateHeaderSelects     = populateHeaderSelects;
-window.populateAuxiliaireOptions = populateAuxiliaireOptions;
-window.loadPeriodes              = loadPeriodes;
-window.findPeriodeId             = findPeriodeId;
+window.populateMarAuxiOptions    = populateMarAuxiOptions;
+window._fetchJson                = _fetchJson;
 window.loadComptesByPlan         = loadComptesByPlan;
 window.loadAllComptesActifs      = loadAllComptesActifs;
-window.loadEcritures             = loadEcritures;
-window.renderEcrituresList       = renderEcrituresList;
-window.toggleEcritureLines       = toggleEcritureLines;
-window.buildEcritureLinesRow     = buildEcritureLinesRow;
+window.loadMarches               = loadMarches;
+window.loadPeriodes              = loadPeriodes;
+window.findPeriodeId             = findPeriodeId;
 window.resolvePlanCodeByOrdre    = resolvePlanCodeByOrdre;
-window._refreshLinesCounter      = _refreshLinesCounter;
+
+// ============================================================
+// DIAGNOSTIC MANUEL — tapez `diagMarche()` dans la console
+// ============================================================
+window.diagMarche = async function () {
+    console.log('═══════ DIAGNOSTIC MARCHE ═══════');
+    try {
+        var url = API.BASE + API.HANDLERS_PATH + API.LOOKUPS;
+        console.log('URL  :', url);
+
+        var resp = await fetch(url);
+        console.log('HTTP :', resp.status);
+        console.log('TYPE :', resp.headers.get('content-type'));
+
+        var data = await resp.json();
+        console.log('success      :', data.success);
+        console.log('sites        :', (data.sites || []).length);
+        console.log('fournisseurs :', (data.fournisseurs || []).length, '← doit être > 0');
+        console.log('articles     :', (data.articles || []).length);
+        console.log('monnaies     :', (data.monnaies || []).length);
+        console.log('plansActifs  :', (data.plansActifs || []).length);
+        if (!(data.fournisseurs || []).length) {
+            console.warn('⚠️  Aucun compte fournisseur admissible dans PLAN1.');
+        }
+    } catch (e) {
+        console.error('❌ Erreur :', e.message);
+    }
+    console.log('═════════════════════════════════');
+};
