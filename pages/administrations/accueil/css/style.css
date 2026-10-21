@@ -1,0 +1,214 @@
+/* ============================================================
+   PAGE ACCUEIL — ADMINISTRATION
+   Design harmonisé avec les pages saisie.aspx / marche.aspx
+   ============================================================ */
+
+.admin-accueil-content {
+    padding: 20px;
+}
+
+/* ─── HERO (bandeau de présentation) ─── */
+.admin-hero {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+    padding: 24px 28px;
+    background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%);
+    color: #fff;
+    border-radius: 12px;
+    margin-bottom: 28px;
+    box-shadow: 0 4px 16px rgba(30, 64, 175, .15);
+}
+
+.admin-hero-icon {
+    flex-shrink: 0;
+    width: 64px;
+    height: 64px;
+    background: rgba(255, 255, 255, .18);
+    border-radius: 16px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 28px;
+}
+
+.admin-hero-text h2 {
+    margin: 0 0 6px 0;
+    font-size: 20px;
+    font-weight: 600;
+    letter-spacing: -.3px;
+}
+
+.admin-hero-text p {
+    margin: 0;
+    font-size: 14px;
+    line-height: 1.5;
+    opacity: .9;
+}
+
+/* ─── GRILLE DES CARTES ─── */
+.admin-cards-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+    gap: 20px;
+}
+
+/* ─── CARTE ─── */
+.admin-card {
+    display: flex;
+    align-items: flex-start;
+    gap: 16px;
+    padding: 22px 22px 22px 22px;
+    background: #ffffff;
+    border: 1px solid #e5e7eb;
+    border-radius: 12px;
+    text-decoration: none;
+    color: inherit;
+    transition: transform .2s ease,
+                box-shadow .2s ease,
+                border-color .2s ease;
+    position: relative;
+    overflow: hidden;
+}
+
+.admin-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 4px;
+    height: 100%;
+    background: #3b82f6;
+    transform: scaleY(0);
+    transform-origin: top;
+    transition: transform .3s ease;
+}
+
+.admin-card:hover {
+    transform: translateY(-4px);
+    box-shadow: 0 10px 28px rgba(15, 23, 42, .12);
+    border-color: #3b82f6;
+}
+
+.admin-card:hover::before {
+    transform: scaleY(1);
+}
+
+.admin-card:hover .admin-card-arrow {
+    transform: translateX(4px);
+    opacity: 1;
+}
+
+.admin-card-icon {
+    flex-shrink: 0;
+    width: 56px;
+    height: 56px;
+    background: #eff6ff;
+    color: #2563eb;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 24px;
+    transition: background .2s ease, color .2s ease;
+}
+
+.admin-card:hover .admin-card-icon {
+    background: #2563eb;
+    color: #fff;
+}
+
+.admin-card-body {
+    flex: 1;
+    min-width: 0;
+}
+
+.admin-card-title {
+    margin: 0 0 6px 0;
+    font-size: 16px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.admin-card-desc {
+    margin: 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: #64748b;
+}
+
+.admin-card-arrow {
+    align-self: center;
+    flex-shrink: 0;
+    color: #94a3b8;
+    font-size: 14px;
+    opacity: .5;
+    transition: transform .2s ease, opacity .2s ease;
+}
+
+/* ─── ÉTAT "aucune carte" ─── */
+.admin-empty {
+    text-align: center;
+    padding: 60px 20px;
+    color: #94a3b8;
+}
+
+.admin-empty i {
+    font-size: 48px;
+    margin-bottom: 16px;
+    opacity: .5;
+}
+
+.admin-empty p {
+    font-size: 15px;
+    margin: 0;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   MODE SOMBRE — Compatibilité data-theme="dark" (si utilisé)
+   ══════════════════════════════════════════════════════════════ */
+body.dark-mode .admin-card,
+body[data-theme="dark"] .admin-card {
+    background: #1e293b;
+    border-color: #334155;
+    color: #e2e8f0;
+}
+
+body.dark-mode .admin-card-title,
+body[data-theme="dark"] .admin-card-title {
+    color: #f1f5f9;
+}
+
+body.dark-mode .admin-card-desc,
+body[data-theme="dark"] .admin-card-desc {
+    color: #94a3b8;
+}
+
+body.dark-mode .admin-card-icon,
+body[data-theme="dark"] .admin-card-icon {
+    background: #1e3a8a;
+    color: #93c5fd;
+}
+
+body.dark-mode .admin-card:hover .admin-card-icon,
+body[data-theme="dark"] .admin-card:hover .admin-card-icon {
+    background: #3b82f6;
+    color: #fff;
+}
+
+/* ─── RESPONSIVE ─── */
+@media (max-width: 768px) {
+    .admin-hero {
+        flex-direction: column;
+        text-align: center;
+        padding: 20px;
+    }
+
+    .admin-cards-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .admin-card {
+        padding: 18px;
+    }
+}

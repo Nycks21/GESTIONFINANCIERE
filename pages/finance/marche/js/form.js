@@ -1,4 +1,5 @@
 // form.js — MARCHE (formulaire ligne)
+// ⭐ CORRECTION MONTANTS : parseMontant + getMoneyNumericValue + setMoneyValue
 'use strict';
 
 function newLigne() {
@@ -19,8 +20,15 @@ function clearFormLigne() {
         _setVal(id, '');
     });
     _setVal('mlTaxe', '0');
-    _setVal('mlMontantLocHT', '0');
-    _setVal('mlMontantRapHT', '0');
+
+    // ⭐ setMoneyValue au lieu de _setVal
+    if (typeof setMoneyValue === 'function') {
+        setMoneyValue('mlMontantLocHT', 0);
+        setMoneyValue('mlMontantRapHT', 0);
+    } else {
+        _setVal('mlMontantLocHT', '0');
+        _setVal('mlMontantRapHT', '0');
+    }
 
     AppState.lastLigneSnapshot = null;
     if (typeof _refreshLinesCounter === 'function') _refreshLinesCounter();
@@ -31,7 +39,14 @@ function clearCurrentLigne() { clearFormLigne(); }
 function undoLigne() {
     if (AppState.lastLigneSnapshot) {
         var snap = AppState.lastLigneSnapshot;
-        Object.keys(snap).forEach(function (k) { _setVal(k, snap[k]); });
+        Object.keys(snap).forEach(function (k) {
+            if (k === 'mlMontantLocHT' || k === 'mlMontantRapHT') {
+                if (typeof setMoneyValue === 'function') setMoneyValue(k, snap[k]);
+                else _setVal(k, snap[k]);
+            } else {
+                _setVal(k, snap[k]);
+            }
+        });
     } else {
         clearFormLigne();
     }
@@ -58,6 +73,21 @@ function editCurrentLigne() {
     loadLigneIntoForm(AppState.selectedLigneIndex);
 }
 
+// ⭐⭐⭐ CORRECTION MAJEURE : lecture montant robuste ⭐⭐⭐
+function _readFormMontant(inputId) {
+    // Priorité 1 : valeur canonique (money-input.js)
+    if (typeof getMoneyNumericValue === 'function') {
+        var v = getMoneyNumericValue(inputId);
+        if (v !== 0) return v;
+    }
+    // Priorité 2 : parse robuste du visible
+    if (typeof parseMontant === 'function') {
+        return parseMontant(_getVal(inputId));
+    }
+    // Fallback (ne devrait pas arriver)
+    return parseFloat(_getVal(inputId)) || 0;
+}
+
 function validateLigne() {
     var designation = (_getVal('mlDesignation') || '').trim();
     if (!designation) {
@@ -71,8 +101,15 @@ function validateLigne() {
         return;
     }
 
-    var locHT = parseFloat(_getVal('mlMontantLocHT') || 0) || 0;
-    var rapHT = parseFloat(_getVal('mlMontantRapHT') || 0) || 0;
+    // ⭐ Lecture robuste des montants
+    var locHT = _readFormMontant('mlMontantLocHT');
+    var rapHT = _readFormMontant('mlMontantRapHT');
+
+    // Log de vérification (visible F12)
+    console.log('[validateLigne] mlMontantLocHT visible="' + _getVal('mlMontantLocHT') +
+                '" → locHT=' + locHT);
+    console.log('[validateLigne] mlMontantRapHT visible="' + _getVal('mlMontantRapHT') +
+                '" → rapHT=' + rapHT);
 
     if (locHT < 0 || rapHT < 0) {
         showErrorToast(_t('marche.msg.amount_invalid') || 'Montant invalide.');
@@ -160,3 +197,4 @@ window.validateLigne        = validateLigne;
 window.deleteCurrentLigne   = deleteCurrentLigne;
 window.duplicateLigne       = duplicateLigne;
 window.clearFormLigne       = clearFormLigne;
+window._readFormMontant     = _readFormMontant;   // ⭐ utilitaire

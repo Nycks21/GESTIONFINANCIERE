@@ -10,8 +10,9 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
 {
     public void ProcessRequest(HttpContext ctx)
     {
-        ctx.Response.ContentType = "application/json";
+        ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Charset = "utf-8";
+        ctx.Response.ContentEncoding = System.Text.Encoding.UTF8;
         ctx.Response.Cache.SetNoStore();
 
         if (!AuthHelper.RequireApiPermission(ctx, "saisie"))
@@ -32,9 +33,10 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
             {
                 conn.Open();
 
-                // ─── EN-TÊTE FECRITURE (avec REFERENCE_FACTURE + DATE_FACTURE) ───
+                // ─── EN-TÊTE FECRITURE (avec MARCHE + REFERENCE_FACTURE + DATE_FACTURE) ───
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, SITE_ID, MONNAIE_ID,
+                           MARCHE,
                            NUMERO, DATE_COMPTABLE, DATE_PIECE,
                            REFERENCE, REFERENCE_FACTURE, DATE_FACTURE,
                            LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT
@@ -52,11 +54,12 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                             ecriture["JOURNAL_ID"]      = r["JOURNAL_ID"].ToString();
                             ecriture["SITE_ID"]         = r["SITE_ID"] == DBNull.Value ? null : r["SITE_ID"].ToString();
                             ecriture["MONNAIE_ID"]      = r["MONNAIE_ID"].ToString();
+                            // ⭐ MARCHE
+                            ecriture["MARCHE"]          = r["MARCHE"] == DBNull.Value ? "" : r["MARCHE"].ToString();
                             ecriture["NUMERO"]          = r["NUMERO"].ToString();
                             ecriture["DATE_COMPTABLE"]  = Convert.ToDateTime(r["DATE_COMPTABLE"]).ToString("yyyy-MM-dd");
                             ecriture["DATE_PIECE"]      = r["DATE_PIECE"] == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_PIECE"]).ToString("yyyy-MM-dd");
                             ecriture["REFERENCE"]       = r["REFERENCE"] == DBNull.Value ? "" : r["REFERENCE"].ToString();
-                            // ⭐ NOUVELLES COLONNES
                             ecriture["REFERENCE_FACTURE"] = r["REFERENCE_FACTURE"] == DBNull.Value ? "" : r["REFERENCE_FACTURE"].ToString();
                             ecriture["DATE_FACTURE"]      = r["DATE_FACTURE"] == DBNull.Value
                                                             ? "" : Convert.ToDateTime(r["DATE_FACTURE"]).ToString("yyyy-MM-dd");
@@ -103,7 +106,6 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                             l["SENS"]    = sens;
                             l["MONTANT"] = montant;
 
-                            // Compatibilité DEBIT / CREDIT
                             l["DEBIT"]  = (sens == "D" && montant.HasValue) ? (object)montant.Value : 0m;
                             l["CREDIT"] = (sens == "C" && montant.HasValue) ? (object)montant.Value : 0m;
 

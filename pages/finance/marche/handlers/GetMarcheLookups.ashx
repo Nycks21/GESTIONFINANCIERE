@@ -10,8 +10,9 @@ public class GetMarcheLookups : IHttpHandler, IRequiresSessionState
 {
     public void ProcessRequest(HttpContext ctx)
     {
-        ctx.Response.ContentType = "application/json";
+        ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Charset = "utf-8";
+        ctx.Response.ContentEncoding = System.Text.Encoding.UTF8;
         ctx.Response.Cache.SetNoStore();
 
         if (!AuthHelper.RequireApiPermission(ctx, "marche"))
@@ -41,7 +42,7 @@ public class GetMarcheLookups : IHttpHandler, IRequiresSessionState
                         sites.Add(Row3(r, "ID", "CODE", "NOM"));
                 }
 
-                // ─── Fournisseurs : comptes collectifs de PLAN1 ───
+                // ─── Fournisseurs = comptes collectifs PLAN1 (CODE LIKE '4%') ───
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT ID, CODE, LIBELLE AS NOM
                     FROM dbo.PLAN1
@@ -99,7 +100,6 @@ public class GetMarcheLookups : IHttpHandler, IRequiresSessionState
                         plansActifs.Add(d);
                     }
                 }
-
             }
 
             ctx.Response.Write(new JavaScriptSerializer().Serialize(new

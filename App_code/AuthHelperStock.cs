@@ -20,10 +20,6 @@ public static class AuthHelperStock
   {
     new AuthHelper.MenuItem { Code = "accueil",      Text = "menu.accueil",      Url = "/pages/accueil/index.aspx",                            Icon = "fas fa-chalkboard",   Section = "section.accueil",    Order = 1  },
     new AuthHelper.MenuItem { Code = "accueils",     Text = "menu.accueils",     Url = "/pages/stock/accueil/index.aspx",                      Icon = "fas fa-box-open",   Section = "section.applications", Order = 2  },
-    new AuthHelper.MenuItem { Code = "unites",       Text = "menu.unites",       Url = "/pages/stock/parametres/unites/unites.aspx",           Icon = "fas fa-ruler",        Section = "section.parametres", Order = 4  },
-    new AuthHelper.MenuItem { Code = "categories",   Text = "menu.categories",   Url = "/pages/stock/parametres/categories/categories.aspx",   Icon = "fas fa-tags",         Section = "section.parametres", Order = 6  },
-    new AuthHelper.MenuItem { Code = "fournisseurs", Text = "menu.fournisseurs", Url = "/pages/stock/parametres/fournisseurs/fournisseurs.aspx", Icon = "fas fa-truck",      Section = "section.parametres", Order = 7  },
-    new AuthHelper.MenuItem { Code = "emplacements", Text = "menu.emplacements", Url = "/pages/stock/parametres/emplacements/emplacements.aspx", Icon = "fas fa-warehouse",  Section = "section.parametres", Order = 8  },
     new AuthHelper.MenuItem { Code = "articles",     Text = "menu.articles",     Url = "/pages/stock/modules/articles/articles.aspx",          Icon = "fas fa-boxes",        Section = "section.mouvements", Order = 9  },
     new AuthHelper.MenuItem { Code = "entrees",      Text = "menu.entrees",      Url = "/pages/stock/modules/entrees/entrees.aspx",            Icon = "fas fa-arrow-down",   Section = "section.mouvements", Order = 10 },
     new AuthHelper.MenuItem { Code = "sorties",      Text = "menu.sorties",      Url = "/pages/stock/modules/sorties/sorties.aspx",            Icon = "fas fa-arrow-up",     Section = "section.mouvements", Order = 11 },

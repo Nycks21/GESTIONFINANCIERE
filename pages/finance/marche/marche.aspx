@@ -305,7 +305,8 @@
                           <i class="fas fa-calendar-alt"></i>
                           <span data-i18n="marche.section.rens"></span>
                         </h3>
-                        <div class="row">
+                        <div class="eh-section-fields">
+                          <div class="row">
                             <div class="col-md-6">
                               <div class="eh-field">
                                 <label data-i18n="marche.col.fournisseur"></label>
@@ -322,31 +323,32 @@
                               </div>
                             </div>
                           </div>
-                        <div class="row">
-                          <div class="col-md-6">
-                            <div class="eh-field">
-                              <label data-i18n="marche.col.type"></label>
-                              <select id="marType" class="form-control">
-                                <option value="FRT">Fournitures</option>
-                                <option value="TRX">Travaux</option>
-                                <option value="SRV">Services</option>
-                                <option value="PIS">Prestations intellectuelles</option>
-                                <option value="ATR">Autre</option>
-                              </select>
+                          <div class="row">
+                            <div class="col-md-6">
+                              <div class="eh-field">
+                                <label data-i18n="marche.col.type"></label>
+                                <select id="marType" class="form-control">
+                                  <option value="FRT">Fournitures</option>
+                                  <option value="TRX">Travaux</option>
+                                  <option value="SRV">Services</option>
+                                  <option value="PIS">Prestations intellectuelles</option>
+                                  <option value="ATR">Autre</option>
+                                </select>
+                              </div>
                             </div>
-                          </div>
 
-                          <div class="col-md-6">
-                            <div class="eh-field">
-                              <label data-i18n="marche.col.mode_passation"></label>
-                              <select id="marMode" class="form-control">
-                                <option value="AON">Appel d'offres national</option>
-                                <option value="AOI">Appel d'offres international</option>
-                                <option value="CST">Consultation</option>
-                                <option value="GAG">Gré à gré</option>
-                                <option value="EDT">Entente directe</option>
-                                <option value="ATR">Autre</option>
-                              </select>
+                            <div class="col-md-6">
+                              <div class="eh-field">
+                                <label data-i18n="marche.col.mode_passation"></label>
+                                <select id="marMode" class="form-control">
+                                  <option value="AON">Appel d'offres national</option>
+                                  <option value="AOI">Appel d'offres international</option>
+                                  <option value="CST">Consultation</option>
+                                  <option value="GAG">Gré à gré</option>
+                                  <option value="EDT">Entente directe</option>
+                                  <option value="ATR">Autre</option>
+                                </select>
+                              </div>
                             </div>
                           </div>
                         </div>
@@ -405,8 +407,6 @@
                             <input type="text" id="marCoursDevise" class="form-control money-input" data-money-field="1"
                               value="0" autocomplete="off" />
                           </div>
-                        </div>
-                        <div class="eh-section-fields">
                           <div class="eh-field">
                             <label data-i18n="marche.col.statut"></label>
                             <select id="marStatut" class="form-control">
@@ -422,7 +422,7 @@
 
                     <div class="eh-field" style="margin-top:12px;">
                       <label data-i18n="marche.col.description"></label>
-                      <textarea id="marDescription" class="form-control" rows="2" maxlength="2000"></textarea>
+                      <input type="text" id="marDescription" class="form-control" rows="2" maxlength="2000" />
                     </div>
                   </div>
 
@@ -435,21 +435,19 @@
                       </div>
 
                       <div class="eb-form-row">
-                        <div class="eb-field eb-w-2">
+                        <!--<div class="eb-field eb-w-2">
                           <label data-i18n="marche.col.article"></label>
                           <select id="mlArticle" class="form-control"></select>
-                        </div>
-                        <div class="eb-field eb-w-2">
+                        </div>-->
+                        <div class="eb-field eb-w-full">
                           <label data-i18n="marche.col.designation"></label>
                           <input type="text" id="mlDesignation" class="form-control" maxlength="500" />
                         </div>
                       </div>
 
+                      <div class="eb-form-row" id="dynPlanFieldsRow"></div>
+
                       <div class="eb-form-row">
-                        <div class="eb-field">
-                          <label data-i18n="marche.col.reference_ligne"></label>
-                          <input type="text" id="mlReference" class="form-control" maxlength="100" />
-                        </div>
                         <div class="eb-field">
                           <label data-i18n="marche.col.taxe"></label>
                           <input type="text" id="mlTaxe" class="form-control money-input" data-money-field="1" value="0"
@@ -464,13 +462,6 @@
                           <label data-i18n="marche.col.montant_rap_ht"></label>
                           <input type="text" id="mlMontantRapHT" class="form-control money-input" data-money-field="1"
                             value="0" autocomplete="off" />
-                        </div>
-                      </div>
-
-                      <div class="eb-form-row">
-                        <div class="eb-field eb-w-full">
-                          <label data-i18n="marche.col.description_ligne"></label>
-                          <input type="text" id="mlDescription" class="form-control" maxlength="500" />
                         </div>
                       </div>
                     </div>

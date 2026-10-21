@@ -824,7 +824,7 @@ body.dark-mode .badge-journal {
     cursor: not-allowed !important;
     filter: grayscale(0.6);
     transform: none !important;
-    pointer-events: auto; /* garde l'infobulle visible */
+    pointer-events: auto;
 }
 
 .la-btn.la-save:disabled {
@@ -965,7 +965,6 @@ body.dark-mode .dirty-indicator {
     box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12);
 }
 
-/* Dark mode */
 body.dark-mode .money-input,
 body.dark-mode [data-money-field="1"] {
     background: #172033;
@@ -985,13 +984,8 @@ body.dark-mode [data-money-field="1"]:focus {
 }
 
 /* ═══════════════ LISTE — Colonnes rapprochement & date pièce ═══════════════ */
+#ecrituresTable { min-width: 1280px; }
 
-/* Largeur minimum du tableau pour éviter le débordement */
-#ecrituresTable {
-    min-width: 1280px;
-}
-
-/* Colonnes Débit rap / Crédit rap — discret background pour différencier */
 #ecrituresTable td:nth-child(9),
 #ecrituresTable td:nth-child(10) {
     background: rgba(0, 0, 0, 0.012);
@@ -1004,29 +998,18 @@ body.dark-mode #ecrituresTable td:nth-child(10) {
     border-left-color: rgba(255, 255, 255, 0.05);
 }
 
-/* Cellule vide (— ou 0,00 en gris) */
 .cell-empty {
     color: #CBD5E1;
     font-style: italic;
 }
 
-body.dark-mode .cell-empty {
-    color: #64748B;
-}
+body.dark-mode .cell-empty { color: #64748B; }
 
-/* S'assure que la sous-ligne s'étend sur 12 colonnes (mise à jour colspan) */
-.ecr-sub-row > td {
-    overflow: visible !important;
-}
+.ecr-sub-row > td { overflow: visible !important; }
 
 /* ═══════════════ VUE.JS INTEGRATION ═══════════════ */
+[v-cloak] { display: none !important; }
 
-/* Anti-flash avant montage Vue */
-[v-cloak] {
-    display: none !important;
-}
-
-/* Assure que les boutons Vue respectent le style global */
 #saisieListApp .grid-table tbody tr.ecr-main-row {
     transition: background-color 0.12s ease;
 }
@@ -1041,7 +1024,6 @@ body.dark-mode .cell-empty {
     color: #1D4ED8 !important;
 }
 
-/* Assure la cohérence de l'affichage monospace */
 #saisieListApp td[style*="monospace"] {
     font-variant-numeric: tabular-nums;
 }
@@ -1057,33 +1039,25 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
     color: #FFFFFF !important;
 }
 
-/* Espacement entre boutons d'action dans la liste des écritures */
-#ecrituresBody .btn-sm + .btn-sm {
-    margin-left: 6px;
-}
+#ecrituresBody .btn-sm + .btn-sm { margin-left: 6px; }
 
 /* ═══════════════ SÉLECTEUR EXERCICE DANS L'EN-TÊTE ═══════════════ */
-
-/* Conteneur h3 : force le non-dépassement et le centrage */
 .eh-section-title {
-    min-height: 28px;        /* ⭐ hauteur garantie */
-    flex-wrap: nowrap;       /* ⭐ empêche le retour ligne */
+    min-height: 28px;
+    flex-wrap: nowrap;
     overflow: hidden;
 }
 
-/* Pill de l'exercice */
 .header-exercice {
-    display: inline-flex;              /* ⭐ inline + flex interne */
-    align-items: center;               /* ⭐ centre verticalement */
-    justify-content: center;           /* ⭐ centre horizontalement */
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
     gap: 5px;
-    margin-left: auto;                 /* ⭐ pousse à droite */
+    margin-left: auto;
     padding: 3px 10px;
-    height: 24px;                      /* ⭐ hauteur fixe compacte */
+    height: 24px;
     max-height: 24px;
-    background: linear-gradient(135deg,
-        rgba(37, 99, 235, 0.10),
-        rgba(37, 99, 235, 0.06));
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.10), rgba(37, 99, 235, 0.06));
     border: 1px solid rgba(37, 99, 235, 0.25);
     border-radius: 10px;
     vertical-align: middle;
@@ -1091,9 +1065,7 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
 }
 
 .header-exercice:hover {
-    background: linear-gradient(135deg,
-        rgba(37, 99, 235, 0.18),
-        rgba(37, 99, 235, 0.10));
+    background: linear-gradient(135deg, rgba(37, 99, 235, 0.18), rgba(37, 99, 235, 0.10));
     border-color: rgba(37, 99, 235, 0.40);
     transform: translateY(-1px);
 }
@@ -1111,8 +1083,8 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
 
 .header-exercice select {
     height: 18px;
-    min-height: 18px !important;      /* ⭐ override form-control */
-    padding: 0 18px 0 4px;            /* place pour la flèche */
+    min-height: 18px !important;
+    padding: 0 18px 0 4px;
     font-size: 11px;
     font-weight: 700;
     color: var(--s-primary);
@@ -1122,8 +1094,6 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
     cursor: pointer;
     line-height: 1;
     min-width: 60px;
-
-    /* ⭐ Flèche custom (SVG inline) */
     appearance: none;
     -webkit-appearance: none;
     -moz-appearance: none;
@@ -1133,41 +1103,27 @@ body.dark-mode #saisieListApp .pagination-wrapper button[style*="background: rgb
     background-size: 8px;
 }
 
-.header-exercice select:focus {
-    outline: none;
-    box-shadow: none;
-}
+.header-exercice select:focus { outline: none; box-shadow: none; }
 
-/* ─── Dark mode ─── */
 body.dark-mode .header-exercice {
-    background: linear-gradient(135deg,
-        rgba(96, 165, 250, 0.15),
-        rgba(96, 165, 250, 0.08));
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.15), rgba(96, 165, 250, 0.08));
     border-color: rgba(96, 165, 250, 0.35);
 }
 
 body.dark-mode .header-exercice:hover {
-    background: linear-gradient(135deg,
-        rgba(96, 165, 250, 0.25),
-        rgba(96, 165, 250, 0.15));
+    background: linear-gradient(135deg, rgba(96, 165, 250, 0.25), rgba(96, 165, 250, 0.15));
     border-color: rgba(96, 165, 250, 0.55);
 }
 
 body.dark-mode .header-exercice label,
-body.dark-mode .header-exercice select {
-    color: #93C5FD;
-}
+body.dark-mode .header-exercice select { color: #93C5FD; }
 
 body.dark-mode .header-exercice select {
     background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6' fill='none'%3E%3Cpath d='M1 1l4 4 4-4' stroke='%2393C5FD' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
 }
 
-body.dark-mode .header-exercice select option {
-    background: #1E293B;
-    color: #F1F5F9;
-}
+body.dark-mode .header-exercice select option { background: #1E293B; color: #F1F5F9; }
 
-/* ─── Mode compact ─── */
 body.saisie-compact .header-exercice {
     height: 20px;
     max-height: 20px;
@@ -1176,8 +1132,4 @@ body.saisie-compact .header-exercice {
 }
 
 body.saisie-compact .header-exercice label { font-size: 9px; }
-body.saisie-compact .header-exercice select {
-    font-size: 10.5px;
-    height: 16px;
-    min-height: 16px !important;
-}
+body.saisie-compact .header-exercice select { font-size: 10.5px; height: 16px; min-height: 16px !important; }

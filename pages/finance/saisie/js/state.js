@@ -18,6 +18,7 @@ const AppState = {
     exercices: [],
     monnaies: [],
     periodes: [],
+    marchesLookup:      [],
     modes: [],         // modes de régularisation (depuis FPARAMETRE)
     plansActifs: [],
     comptesParPlan: {},   // { 1: [...], 2: [...] }

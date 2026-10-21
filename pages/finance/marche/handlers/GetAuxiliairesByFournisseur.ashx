@@ -6,19 +6,13 @@ using System.Web;
 using System.Web.Script.Serialization;
 using System.Web.SessionState;
 
-/// <summary>
-/// Retourne UNIQUEMENT les auxiliaires (FTIERS) rattachés au compte collectif
-/// du compte collectif (PLAN1) sélectionné.
-///
-/// Règle : FTIERS.PLAN_ELEMENT_ID == PLAN1.ID
-/// Aucun fournisseur → liste vide (jamais de fallback).
-/// </summary>
 public class GetAuxiliairesByFournisseur : IHttpHandler, IRequiresSessionState
 {
     public void ProcessRequest(HttpContext ctx)
     {
-        ctx.Response.ContentType = "application/json";
+        ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Charset     = "utf-8";
+        ctx.Response.ContentEncoding = System.Text.Encoding.UTF8;
         ctx.Response.Cache.SetNoStore();
 
         if (!AuthHelper.RequireApiPermission(ctx, "marche"))
@@ -32,7 +26,6 @@ public class GetAuxiliairesByFournisseur : IHttpHandler, IRequiresSessionState
         {
             string fourIdRaw = (ctx.Request.QueryString["fournisseurId"] ?? "").Trim();
 
-            // ⭐ Aucun fournisseur → liste vide
             if (string.IsNullOrEmpty(fourIdRaw))
             {
                 ctx.Response.Write(new JavaScriptSerializer().Serialize(new
@@ -55,7 +48,7 @@ public class GetAuxiliairesByFournisseur : IHttpHandler, IRequiresSessionState
             {
                 conn.Open();
 
-                // FTIERS.PLAN_ELEMENT_ID référence le compte collectif PLAN1.ID.
+                // Auxiliaires = FTIERS dont PLAN_ELEMENT_ID = PLAN1.ID du fournisseur
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT t.ID, t.CODE, t.NOM, t.TYPE_TIERS,
                            t.PLAN_ELEMENT_ID, t.PLAN_ORDER

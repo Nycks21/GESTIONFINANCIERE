@@ -8,12 +8,14 @@ function showSpinner() {
     s.style.display = 'flex'; s.style.visibility = 'visible'; s.style.opacity = '1';
     s.removeAttribute('aria-hidden');
 }
+
 function hideSpinner() {
     var s = _el('spinnerOverlay');
     if (!s) return;
     s.style.display = 'none'; s.style.visibility = 'hidden'; s.style.opacity = '0';
     s.setAttribute('aria-hidden', 'true');
 }
+
 function forceHideSpinner() { hideSpinner(); }
 
 // ─── TABS ───
@@ -46,16 +48,20 @@ function focusSearch() {
     var s = _el('search-filter');
     if (s) s.focus();
 }
+
 function printEcriture() {
     if (!AppState.editingId) { showErrorToast('Aucune écriture chargée.'); return; }
     window.print();
 }
+
 function openVentilations() {
     Swal.fire({ icon: 'info', title: 'Ventilations', text: 'Fonctionnalité à venir.' });
 }
+
 function openFichesImputation() {
     Swal.fire({ icon: 'info', title: 'Fiches d\'imputation', text: 'Fonctionnalité à venir.' });
 }
+
 function focusHeader() {
     var el = _el('ecrLibelle');
     if (el) el.focus();

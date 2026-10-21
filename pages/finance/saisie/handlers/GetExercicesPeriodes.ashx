@@ -10,7 +10,8 @@ public class GetExercicesPeriodes : IHttpHandler, IRequiresSessionState
 {
     public void ProcessRequest(HttpContext ctx)
     {
-        ctx.Response.ContentType = "application/json";
+        // ⭐ Harmonisé avec GetBalanceGenerale.ashx
+        ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Charset     = "utf-8";
         ctx.Response.Cache.SetNoStore();
 
@@ -27,7 +28,8 @@ public class GetExercicesPeriodes : IHttpHandler, IRequiresSessionState
             var periodes = new List<Dictionary<string, object>>();
             string connStr = AuthHelper.ConnectionString;
 
-            Guid exerciceId;
+            // ⭐⭐⭐ CORRECTION CS0165 : initialiser à Guid.Empty
+            Guid exerciceId = Guid.Empty;
             bool hasExercice = !string.IsNullOrEmpty(exerciceIdRaw)
                             && Guid.TryParse(exerciceIdRaw, out exerciceId);
 
@@ -78,7 +80,11 @@ public class GetExercicesPeriodes : IHttpHandler, IRequiresSessionState
         {
             ctx.Response.StatusCode = 500;
             ctx.Response.Write(new JavaScriptSerializer().Serialize(new
-            { success = false, message = ex.Message }));
+            {
+                success = false,
+                message = ex.Message,
+                type    = ex.GetType().Name
+            }));
         }
     }
 

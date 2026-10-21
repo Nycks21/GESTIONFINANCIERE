@@ -1,4 +1,4 @@
-﻿﻿﻿using System;
+﻿﻿using System;
 using System.Collections.Generic;
 using System.Configuration;
 using System.Data.SqlClient;
@@ -499,31 +499,6 @@ public static class AuthHelper
 
       html.Append(@"<ul class=""navbar-nav topbar-right"">");
 
-      string currentCulture = LocalizationHelper.CurrentCultureCode;
-      html.Append(@"
-                <li class=""nav-item"">
-                    <div class=""lang-selector-modern"">
-                        <i class=""fas fa-globe lang-selector-icon""></i>
-                        <select id=""langSelect"" class=""lang-select-modern"">");
-      for (int i = 0; i < LocalizationHelper.SupportedCultures.Length; i++)
-      {
-        string code = LocalizationHelper.SupportedCultures[i];
-        string name = LocalizationHelper.CultureNames[i];
-        string selected = (code == currentCulture) ? " selected" : "";
-        html.AppendFormat(@"<option value=""{0}""{1}>{2}</option>", code, selected, HttpUtility.HtmlEncode(name));
-      }
-      html.Append(@"</select>
-                    </div>
-                </li>");
-
-      html.Append(@"
-                <li class=""nav-item"">
-                    <label class=""switch switch-modern"" for=""toggleDarkMode"" title=""Mode sombre"">
-                        <input type=""checkbox"" id=""toggleDarkMode"">
-                        <span class=""slider-modern round""></span>
-                    </label>
-                </li>");
-
       if (HasPermission("requetes"))
       {
         html.Append(@"
@@ -556,6 +531,55 @@ public static class AuthHelper
                     </div>
                 </li>");
       }
+
+      html.Append(@"
+                  <li class=""nav-item"">
+                    <a href=""/pages/accueil/index.aspx"" class=""nav-link topbar-icon-btn topbar-logout"" title=""" + T("Application") + @""">
+                        <i class=""fas fa-server""></i>
+                    </a>
+                  </li>
+      ");
+
+      html.Append(@"
+                  <li class=""nav-item"">
+                    <a href=""/pages/administrations/accueil/index.aspx"" class=""nav-link topbar-icon-btn topbar-logout"" title=""" + T("Application") + @""">
+                        <i class=""fas fa-users""></i>
+                    </a>
+                  </li>
+      ");
+
+      html.Append(@"
+                  <li class=""nav-item"">
+                    <a href=""/pages/generale/generale.aspx"" class=""nav-link topbar-icon-btn topbar-logout"" title=""" + T("Setting") + @""">
+                        <i class=""fas fa-cog""></i>
+                    </a>
+                  </li>
+      ");
+
+      string currentCulture = LocalizationHelper.CurrentCultureCode;
+      html.Append(@"
+                <li class=""nav-item"">
+                    <div class=""lang-selector-modern"">
+                        <i class=""fas fa-globe lang-selector-icon""></i>
+                        <select id=""langSelect"" class=""lang-select-modern"">");
+      for (int i = 0; i < LocalizationHelper.SupportedCultures.Length; i++)
+      {
+        string code = LocalizationHelper.SupportedCultures[i];
+        string name = LocalizationHelper.CultureNames[i];
+        string selected = (code == currentCulture) ? " selected" : "";
+        html.AppendFormat(@"<option value=""{0}""{1}>{2}</option>", code, selected, HttpUtility.HtmlEncode(name));
+      }
+      html.Append(@"</select>
+                    </div>
+                </li>");
+
+      html.Append(@"
+                <li class=""nav-item"">
+                    <label class=""switch switch-modern"" for=""toggleDarkMode"" title=""Mode sombre"">
+                        <input type=""checkbox"" id=""toggleDarkMode"">
+                        <span class=""slider-modern round""></span>
+                    </label>
+                </li>");
 
       html.Append(@"
                 <li class=""nav-item"">

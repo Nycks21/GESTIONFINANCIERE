@@ -1,12 +1,35 @@
 // crud.js — MARCHE (actions CRUD + dirty tracking + auxi dépendant du fournisseur)
-// ⭐ Aligné sur le schéma SQL :
-//    - FMARCHE.TYPE_MARCHE    VARCHAR(5)   → FRT/TRX/SRV/PIS/ATR
-//    - FMARCHE.MODE_PASSATION VARCHAR(5)   → AON/AOI/CST/GAG/EDT/ATR
-//    - FMARCHE.STATUT         TINYINT      → 1/2/3/4
-//    - FMARCHE.AUXILIAIRE     NVARCHAR(50) → FTIERS.CODE
-//    - FTIERS.PLAN_ELEMENT_ID → PLAN1.ID pour filtrer marAuxi
+// ⭐ Aligné sur le schéma SQL + lecture montant robuste via parseMontant
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
+
+// ============================================================
+// HELPER LOCAL — lecture montant robuste
+// ============================================================
+function _readMontant(inputId) {
+    if (typeof getMoneyNumericValue === 'function') {
+        return getMoneyNumericValue(inputId);
+    }
+    if (typeof parseMontant === 'function') {
+        return parseMontant(_getVal(inputId));
+    }
+    return parseFloat(_getVal(inputId)) || 0;
+}
+
+function _writeMontant(inputId, value) {
+    if (typeof setMoneyValue === 'function') {
+        setMoneyValue(inputId, value || 0);
+    } else {
+        _setVal(inputId, value || 0);
+    }
+}
+
+function _readDecimal(v) {
+    if (v === null || v === undefined || v === '') return 0;
+    if (typeof parseMontant === 'function') return parseMontant(v);
+    var n = parseFloat(v);
+    return isFinite(n) ? n : 0;
+}
 
 // ============================================================
 // DIRTY TRACKING
@@ -48,7 +71,7 @@ window.addEventListener('beforeunload', function (e) {
 });
 
 // ============================================================
-// HELPER — SITE PAR DÉFAUT
+// HELPERS
 // ============================================================
 function _getDefaultSiteId() {
     var sites = AppState.sites || [];
@@ -61,34 +84,22 @@ function _getDefaultSiteId() {
     return sites.length ? sites[0].ID : '';
 }
 
-// ============================================================
-// HELPER — FOURNISSEUR COURANT (objet)
-// ============================================================
 function _getCurrentFournisseur() {
     var id = _getVal('marFournisseur');
     if (!id) return null;
     return (AppState.fournisseurs || []).find(function (f) { return f.ID === id; }) || null;
 }
 
-// ============================================================
-// ⭐ CALLBACK : changement de fournisseur
-//    → reset immédiat de l'auxi + fetch des nouveaux auxiliaires
-// ============================================================
 function onFournisseurChange() {
     var fourId = _getVal('marFournisseur') || null;
-
-    // Reset visuel immédiat pour éviter toute sélection fantôme
     var aux = document.getElementById('marAuxi');
     if (aux) aux.value = '';
-
-    // ⭐ Toujours preserveValue = false (changement de contexte)
     populateMarAuxiOptions(fourId, false);
-
     markDirty();
 }
 
 // ============================================================
-// CONVERSION LIGNE SERVEUR → CLIENT
+// CONVERSIONS
 // ============================================================
 function _serverLigneToClient(l) {
     var ordreToKey = buildOrdreToKeyMap();
@@ -100,13 +111,13 @@ function _serverLigneToClient(l) {
         referenceLigne:    l.REFERENCE_LIGNE || '',
         exerciceId:        l.EXERCICE_ID || '',
         description:       l.DESCRIPTION || '',
-        taxe:              parseFloat(l.TAXE || 0),
-        montantLocHT:      parseFloat(l.MONTANT_LOC_HT  || 0),
-        montantLocTVA:     parseFloat(l.MONTANT_LOC_TVA || 0),
-        montantLocTTC:     parseFloat(l.MONTANT_LOC_TTC || 0),
-        montantRapHT:      parseFloat(l.MONTANT_RAP_HT  || 0),
-        montantRapTVA:     parseFloat(l.MONTANT_RAP_TVA || 0),
-        montantRapTTC:     parseFloat(l.MONTANT_RAP_TTC || 0),
+        taxe:              _readDecimal(l.TAXE),
+        montantLocHT:      _readDecimal(l.MONTANT_LOC_HT),
+        montantLocTVA:     _readDecimal(l.MONTANT_LOC_TVA),
+        montantLocTTC:     _readDecimal(l.MONTANT_LOC_TTC),
+        montantRapHT:      _readDecimal(l.MONTANT_RAP_HT),
+        montantRapTVA:     _readDecimal(l.MONTANT_RAP_TVA),
+        montantRapTTC:     _readDecimal(l.MONTANT_RAP_TTC),
         sourceFinancement: l.SOURCE_FINANCEMENT || '',
         observations:      l.OBSERVATIONS || ''
     };
@@ -120,9 +131,6 @@ function _serverLigneToClient(l) {
     return out;
 }
 
-// ============================================================
-// CONVERSION LIGNE CLIENT → PAYLOAD
-// ============================================================
 function _clientLigneToPayload(l) {
     var keyToOrdre = buildKeyToOrdreMap();
 
@@ -133,13 +141,13 @@ function _clientLigneToPayload(l) {
         referenceLigne:    l.referenceLigne || null,
         exerciceId:        l.exerciceId || null,
         description:       l.description || null,
-        taxe:              l.taxe || 0,
-        montantLocHT:      l.montantLocHT || 0,
-        montantLocTVA:     l.montantLocTVA || 0,
-        montantLocTTC:     l.montantLocTTC || 0,
-        montantRapHT:      l.montantRapHT || 0,
-        montantRapTVA:     l.montantRapTVA || 0,
-        montantRapTTC:     l.montantRapTTC || 0,
+        taxe:              _readDecimal(l.taxe),
+        montantLocHT:      _readDecimal(l.montantLocHT),
+        montantLocTVA:     _readDecimal(l.montantLocTVA),
+        montantLocTTC:     _readDecimal(l.montantLocTTC),
+        montantRapHT:      _readDecimal(l.montantRapHT),
+        montantRapTVA:     _readDecimal(l.montantRapTVA),
+        montantRapTTC:     _readDecimal(l.montantRapTTC),
         sourceFinancement: l.sourceFinancement || null,
         observations:      l.observations || null
     };
@@ -168,18 +176,17 @@ function newMarche() {
     _setVal('marNumeroInput', '');
     _setVal('marSite', _getDefaultSiteId() || '');
     _setVal('marFournisseur', '');
-    _setVal('marType', 'FRT');                 // ⭐ code BDD
-    _setVal('marMode', 'AON');                 // ⭐ code BDD
+    _setVal('marType', 'FRT');
+    _setVal('marMode', 'AON');
     _setVal('marDateLancement', '');
     _setVal('marDateAttribution', '');
     _setVal('marDateSignature', new Date().toISOString().slice(0, 10));
     _setVal('marDateDebut', '');
     _setVal('marDateFin', '');
-    _setVal('marCoursDevise', '1');
-    _setVal('marStatut', '1');                 // ⭐ TINYINT 1..4
+    _writeMontant('marCoursDevise', 1);
+    _setVal('marStatut', '1');
     _setVal('marDescription', '');
 
-    // ⭐ Aucun fournisseur → marAuxi vide et désactivé
     populateMarAuxiOptions(null, false);
 
     clearFormLigne();
@@ -191,9 +198,6 @@ function newMarche() {
     markClean();
 }
 
-// ============================================================
-// VIDER LE MARCHÉ (avec confirmation si dirty)
-// ============================================================
 function clearMarche() {
     if (AppState.lignes.length && AppState.editingId) {
         Swal.fire({
@@ -212,7 +216,7 @@ function clearMarche() {
 }
 
 // ============================================================
-// CHARGER UN MARCHÉ POUR ÉDITION
+// ÉDITION
 // ============================================================
 async function editMarche(id) {
     if (hasUnsavedChanges() && !confirmLeaveEdit()) return;
@@ -233,34 +237,29 @@ async function editMarche(id) {
         _setVal('editingId', m.ID);
         _setVal('marNumeroInput', m.NUMERO || '');
         _setVal('marSite', m.SITE_ID || '');
-        _setVal('marType', m.TYPE_MARCHE || 'FRT');            // ⭐ code court
-        _setVal('marMode', m.MODE_PASSATION || 'AON');         // ⭐ code court
+        _setVal('marType', m.TYPE_MARCHE || 'FRT');
+        _setVal('marMode', m.MODE_PASSATION || 'AON');
         _setVal('marDateLancement',   m.DATE_LANCEMENT   || '');
         _setVal('marDateAttribution', m.DATE_ATTRIBUTION || '');
         _setVal('marDateSignature',   m.DATE_SIGNATURE   || '');
         _setVal('marDateDebut',       m.DATE_DEBUT       || '');
         _setVal('marDateFin',         m.DATE_FIN         || '');
-        _setVal('marCoursDevise', m.COURS_DEVISE || 0);
-        _setVal('marStatut', String(m.STATUT || '1'));         // ⭐ "1".."4"
+        _writeMontant('marCoursDevise', m.COURS_DEVISE || 0);
+        _setVal('marStatut', String(m.STATUT || '1'));
         _setVal('marDescription', m.DESCRIPTION || '');
 
-        // ⭐ Fournisseur → chargement async des auxiliaires → puis sélection de l'auxi
+        // ⭐ Fournisseur → auxi
         _setVal('marFournisseur', m.FOURNISSEUR_ID || '');
-
         await populateMarAuxiOptions(m.FOURNISSEUR_ID || null, false);
 
         if (m.AUXILIAIRE) {
             var auxSel = document.getElementById('marAuxi');
             if (auxSel) {
                 auxSel.value = m.AUXILIAIRE;
-                // Si l'auxi enregistré n'existe plus dans la liste → reset propre
                 if (auxSel.value !== m.AUXILIAIRE) {
                     auxSel.value = '';
-                    _setAuxHint(
-                        document.getElementById('marAuxHint'),
-                        'marche.hint.aux_orphan',
-                        'warning'
-                    );
+                    _setAuxHint(document.getElementById('marAuxHint'),
+                                'marche.hint.aux_orphan', 'warning');
                 }
             }
         }
@@ -281,6 +280,12 @@ async function editMarche(id) {
             AppState.lignes.push(client);
         });
 
+        // ⭐ LOG de vérification post-chargement
+        console.log('[editMarche] lignes chargées :',
+            AppState.lignes.map(function(x) {
+                return { ht: x.montantLocHT, htTTC: x.montantLocTTC };
+            }));
+
         renderGrid();
         computeTotaux();
 
@@ -296,22 +301,19 @@ async function editMarche(id) {
 }
 
 // ============================================================
-// SAUVEGARDER LE MARCHÉ
+// SAUVEGARDER
 // ============================================================
 async function saveMarche(e) {
     if (e) e.preventDefault();
 
     var btnSave = document.getElementById('btnSaveMarche');
     if (btnSave && btnSave.disabled) {
-        showToast(
-            _t('marche.msg.cannot_save') || 'Impossible d\'enregistrer',
-            _t('marche.msg.save_disabled') || 'Marché incomplet',
-            'warning', 2500
-        );
+        showToast(_t('marche.msg.cannot_save') || 'Impossible d\'enregistrer',
+                  _t('marche.msg.save_disabled') || 'Marché incomplet',
+                  'warning', 2500);
         return;
     }
 
-    // ─── Validation ───
     var validation = validateMarche();
     if (!validation.valid) {
         Swal.fire({
@@ -324,23 +326,22 @@ async function saveMarche(e) {
         return;
     }
 
-    // ─── Récupération du fournisseur ───
     var fourId  = _getVal('marFournisseur') || null;
     var fourObj = _getCurrentFournisseur();
+    var coursDeviseNum = _readMontant('marCoursDevise');
 
-    // ─── Payload ───
     var payload = {
         id:               AppState.editingId,
         siteId:           _getVal('marSite') || _getDefaultSiteId() || null,
         numero:           (_getVal('marNumeroInput') || '').trim(),
         fournisseurId:    fourId,
         fournisseurNom:   fourObj ? (fourObj.NOM || '') : '',
-        auxiliaire:       _getVal('marAuxi') || null,           // ⭐ CODE FTIERS
-        typeMarche:       _getVal('marType'),                   // ⭐ FRT/TRX/...
-        modePassation:    _getVal('marMode'),                   // ⭐ AON/AOI/...
-        statut:           _getVal('marStatut'),                 // ⭐ "1".."4"
+        auxiliaire:       _getVal('marAuxi') || null,
+        typeMarche:       _getVal('marType'),
+        modePassation:    _getVal('marMode'),
+        statut:           _getVal('marStatut'),
         description:      (_getVal('marDescription') || '').trim(),
-        coursDevise:      parseFloat(_getVal('marCoursDevise') || 0) || 0,
+        coursDevise:      coursDeviseNum,
         dateLancement:    _getVal('marDateLancement')   || null,
         dateAttribution:  _getVal('marDateAttribution') || null,
         dateSignature:    _getVal('marDateSignature')   || null,
@@ -349,6 +350,45 @@ async function saveMarche(e) {
         lignes:           AppState.lignes.map(_clientLigneToPayload)
     };
 
+    // ⭐⭐⭐ DÉTECTION D'ANOMALIE : alerter si un montant semble tronqué
+    var anomalies = [];
+    payload.lignes.forEach(function (lg, i) {
+        if (lg.montantLocHT > 0 && lg.montantLocHT < 100) {
+            var source = AppState.lignes[i];
+            // Si la valeur client est suspecte ET qu'il y a d'autres indices
+            anomalies.push('Ligne ' + (i + 1) + ' : montantLocHT=' + lg.montantLocHT);
+        }
+    });
+
+    if (anomalies.length > 0) {
+        console.warn('[saveMarche] ⚠️ ANOMALIE DÉTECTÉE :', anomalies);
+        console.warn('[saveMarche] Vérifiez que form.js validateLigne utilise parseMontant()');
+        console.warn('[saveMarche] AppState.lignes =', AppState.lignes);
+        Swal.fire({
+            icon: 'warning',
+            title: 'Montants suspects',
+            html: 'Certains montants semblent anormalement bas :<br><br>' +
+                  '<code>' + anomalies.join('<br>') + '</code><br><br>' +
+                  '<small>Vérifiez les valeurs ou rechargez la page (Ctrl+F5).</small>',
+            showCancelButton: true,
+            confirmButtonText: 'Enregistrer quand même',
+            cancelButtonText: 'Annuler'
+        }).then(function (r) {
+            if (r.isConfirmed) _doSave(payload, btnSave);
+        });
+        return;
+    }
+
+    // Log normal
+    console.log('[saveMarche] coursDevise =', payload.coursDevise);
+    console.log('[saveMarche] lignes =', payload.lignes.map(function(x) {
+        return { ht: x.montantLocHT, tva: x.montantLocTVA, ttc: x.montantLocTTC };
+    }));
+
+    _doSave(payload, btnSave);
+}
+
+async function _doSave(payload, btnSave) {
     if (btnSave) btnSave.disabled = true;
 
     try {
@@ -459,17 +499,19 @@ window.saveMarche              = saveMarche;
 window.deleteMarche            = deleteMarche;
 window.deleteCurrentMarche     = deleteCurrentMarche;
 window.loadNextNumero          = loadNextNumero;
-window.onFournisseurChange     = onFournisseurChange;     // ⭐
-window.populateMarAuxiOptions  = populateMarAuxiOptions;  // ⭐ async désormais
+window.onFournisseurChange     = onFournisseurChange;
+window.populateMarAuxiOptions  = populateMarAuxiOptions;
 
 window._getDefaultSiteId       = _getDefaultSiteId;
 window._getCurrentFournisseur  = _getCurrentFournisseur;
-window._fillAuxSelect          = _fillAuxSelect;          // ⭐ utilitaire
-window._setAuxHint             = _setAuxHint;             // ⭐ utilitaire
+window._fillAuxSelect          = _fillAuxSelect;
+window._setAuxHint             = _setAuxHint;
 window._serverLigneToClient    = _serverLigneToClient;
 window._clientLigneToPayload   = _clientLigneToPayload;
+window._readMontant            = _readMontant;
+window._writeMontant           = _writeMontant;
+window._readDecimal            = _readDecimal;
 
-// ⭐ Dirty tracking
 window.markDirty            = markDirty;
 window.markClean            = markClean;
 window.hasUnsavedChanges    = hasUnsavedChanges;

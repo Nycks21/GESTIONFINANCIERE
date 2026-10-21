@@ -11,8 +11,9 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
 {
     public void ProcessRequest(HttpContext ctx)
     {
-        ctx.Response.ContentType = "application/json";
+        ctx.Response.ContentType = "application/json; charset=utf-8";
         ctx.Response.Charset = "utf-8";
+        ctx.Response.ContentEncoding = System.Text.Encoding.UTF8;
         ctx.Response.Cache.SetNoStore();
 
         if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
@@ -37,11 +38,12 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             string dateCmp          = GetString(data, "dateComptable");
             string datePiece        = GetString(data, "datePiece");
             string reference        = (GetString(data, "reference") ?? "").Trim();
-            // ⭐ NOUVEAUX CHAMPS
             string referenceFacture = (GetString(data, "referenceFacture") ?? "").Trim();
             string dateFacture      = GetString(data, "dateFacture");
             string libelle          = (GetString(data, "libelle") ?? "").Trim();
             string statut           = (GetString(data, "statut") ?? "BROUILLON").Trim().ToUpperInvariant();
+            // ⭐ NOUVEAU : ID du marché (GUID) stocké dans FECRITURE.MARCHE
+            string marche           = (GetString(data, "marche") ?? "").Trim();
 
             Guid tmp;
             if (string.IsNullOrEmpty(exerciceId) || !Guid.TryParse(exerciceId, out tmp))
@@ -54,6 +56,10 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             { ctx.Response.Write("{\"success\":false,\"message\":\"Numéro obligatoire.\"}"); return; }
             if (string.IsNullOrEmpty(libelle))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Libellé obligatoire.\"}"); return; }
+
+            // ⭐ Validation du marché : doit être un GUID valide si fourni
+            if (!string.IsNullOrEmpty(marche) && !Guid.TryParse(marche, out tmp))
+            { ctx.Response.Write("{\"success\":false,\"message\":\"Identifiant marché invalide.\"}"); return; }
 
             Guid siteGuid = Guid.Empty;
             bool hasSite = !string.IsNullOrEmpty(siteId) && Guid.TryParse(siteId, out siteGuid);
@@ -99,17 +105,18 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 else             totalCDevise += montantDevise;
 
                 var pl = new Dictionary<string, object>();
-                pl["ID"]              = GetString(l, "id");
-                pl["COMPTE_ID"]       = compteId;
+                pl["ID"]                = GetString(l, "id");
+                pl["COMPTE_ID"]         = compteId;
                 pl["COMPTE_PLAN_ORDER"] = GetInt(l, "comptePlanOrder", 0);
-                pl["TIERS_ID"]        = null;
+                pl["TIERS_ID"]          = null;
                 string tiersStr = GetString(l, "tiersId");
-                if (!string.IsNullOrEmpty(tiersStr) && Guid.TryParse(tiersStr, out tiersId)) pl["TIERS_ID"] = tiersId;
-                pl["AUXILIAIRE"]      = GetString(l, "auxiliaire");
-                pl["LIBELLE"]         = GetString(l, "libelle");
-                pl["SENS"]            = sens;
-                pl["MONTANT"]         = montant;
-                pl["MONTANT_DEVISE"]  = montantDevise;
+                if (!string.IsNullOrEmpty(tiersStr) && Guid.TryParse(tiersStr, out tiersId))
+                    pl["TIERS_ID"] = tiersId;
+                pl["AUXILIAIRE"]         = GetString(l, "auxiliaire");
+                pl["LIBELLE"]            = GetString(l, "libelle");
+                pl["SENS"]               = sens;
+                pl["MONTANT"]            = montant;
+                pl["MONTANT_DEVISE"]     = montantDevise;
                 pl["SOURCE_FINANCEMENT"] = GetString(l, "sourceFinancement");
 
                 for (int k = 1; k <= 10; k++)
@@ -152,6 +159,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                         string periodeIdFinal = EnsurePeriodeFromExercice(
                             conn, tx, exerciceId, dtComptable, userId);
 
+                        // Unicité numéro journal/exercice
                         using (var cmdChk = new SqlCommand(@"
                             SELECT COUNT(1) FROM FECRITURE
                             WHERE JOURNAL_ID = @j AND EXERCICE_ID = @e AND NUMERO = @n
@@ -178,11 +186,12 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                     throw new Exception("Écriture non modifiable (statut " + curStatut + ").");
                             }
 
-                            // ⭐ UPDATE avec REFERENCE_FACTURE + DATE_FACTURE
+                            // ⭐ UPDATE avec MARCHE + REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 UPDATE FECRITURE
                                 SET EXERCICE_ID=@ex, PERIODE_ID=@pe, JOURNAL_ID=@j,
                                     SITE_ID=@site, MONNAIE_ID=@m,
+                                    MARCHE=@marche,
                                     NUMERO=@n, DATE_COMPTABLE=@dc, DATE_PIECE=@dp,
                                     REFERENCE=@ref, REFERENCE_FACTURE=@refFact, DATE_FACTURE=@dateFact,
                                     LIBELLE=@lib, TOTAL_DEBIT=@td, TOTAL_CREDIT=@tc,
@@ -195,11 +204,12 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@j", journalId);
                                 cmd.Parameters.AddWithValue("@site", hasSite ? (object)siteGuid : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@m", monnaieId);
+                                // ⭐ NOUVEAU
+                                cmd.Parameters.AddWithValue("@marche", string.IsNullOrEmpty(marche) ? (object)DBNull.Value : marche);
                                 cmd.Parameters.AddWithValue("@n", numero);
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
                                 cmd.Parameters.AddWithValue("@dp", string.IsNullOrEmpty(datePiece) ? (object)DBNull.Value : DateTime.Parse(datePiece));
                                 cmd.Parameters.AddWithValue("@ref", string.IsNullOrEmpty(reference) ? (object)DBNull.Value : reference);
-                                // ⭐ NOUVEAU
                                 cmd.Parameters.AddWithValue("@refFact", string.IsNullOrEmpty(referenceFacture) ? (object)DBNull.Value : referenceFacture);
                                 cmd.Parameters.AddWithValue("@dateFact", string.IsNullOrEmpty(dateFacture) ? (object)DBNull.Value : DateTime.Parse(dateFacture));
                                 cmd.Parameters.AddWithValue("@lib", libelle);
@@ -219,15 +229,17 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                         }
                         else
                         {
-                            // ⭐ INSERT avec REFERENCE_FACTURE + DATE_FACTURE
+                            // ⭐ INSERT avec MARCHE + REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 INSERT INTO FECRITURE
                                     (ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, SITE_ID, MONNAIE_ID,
+                                     MARCHE,
                                      NUMERO, DATE_COMPTABLE, DATE_PIECE,
                                      REFERENCE, REFERENCE_FACTURE, DATE_FACTURE,
                                      LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT, CREATED_BY, CREATED_AT)
                                 VALUES
                                     (@id, @ex, @pe, @j, @site, @m,
+                                     @marche,
                                      @n, @dc, @dp,
                                      @ref, @refFact, @dateFact,
                                      @lib, @td, @tc, @st, @u, GETDATE())", conn, tx))
@@ -238,11 +250,12 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@j", journalId);
                                 cmd.Parameters.AddWithValue("@site", hasSite ? (object)siteGuid : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@m", monnaieId);
+                                // ⭐ NOUVEAU
+                                cmd.Parameters.AddWithValue("@marche", string.IsNullOrEmpty(marche) ? (object)DBNull.Value : marche);
                                 cmd.Parameters.AddWithValue("@n", numero);
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
                                 cmd.Parameters.AddWithValue("@dp", string.IsNullOrEmpty(datePiece) ? (object)DBNull.Value : DateTime.Parse(datePiece));
                                 cmd.Parameters.AddWithValue("@ref", string.IsNullOrEmpty(reference) ? (object)DBNull.Value : reference);
-                                // ⭐ NOUVEAU
                                 cmd.Parameters.AddWithValue("@refFact", string.IsNullOrEmpty(referenceFacture) ? (object)DBNull.Value : referenceFacture);
                                 cmd.Parameters.AddWithValue("@dateFact", string.IsNullOrEmpty(dateFacture) ? (object)DBNull.Value : DateTime.Parse(dateFacture));
                                 cmd.Parameters.AddWithValue("@lib", libelle);
@@ -319,8 +332,11 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                             {
                                 cmdLog.Parameters.AddWithValue("@u", userId);
                                 cmdLog.Parameters.AddWithValue("@a", isEdit ? "ECRITURE_EDIT" : "ECRITURE_ADD");
-                                cmdLog.Parameters.AddWithValue("@d", numero + " - " + libelle
-                                    + " (M=" + totalD.ToString("0.00") + " / MD=" + totalDDevise.ToString("0.00") + ")");
+                                cmdLog.Parameters.AddWithValue("@d",
+                                    numero + " - " + libelle
+                                    + (string.IsNullOrEmpty(marche) ? "" : " [MARCHE=" + marche + "]")
+                                    + " (M=" + totalD.ToString("0.00")
+                                    + " / MD=" + totalDDevise.ToString("0.00") + ")");
                                 cmdLog.Parameters.AddWithValue("@ip", ip);
                                 cmdLog.ExecuteNonQuery();
                             }
@@ -418,12 +434,14 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
 
     private string GetString(Dictionary<string, object> data, string key)
     { return data.ContainsKey(key) && data[key] != null ? data[key].ToString() : null; }
+
     private int GetInt(Dictionary<string, object> data, string key, int def)
     {
         int v;
         if (data.ContainsKey(key) && data[key] != null && int.TryParse(data[key].ToString(), out v)) return v;
         return def;
     }
+
     private decimal GetDecimal(Dictionary<string, object> data, string key, decimal def)
     {
         decimal v;
@@ -432,6 +450,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 System.Globalization.CultureInfo.InvariantCulture, out v)) return v;
         return def;
     }
+
     private List<Dictionary<string, object>> GetObjectList(Dictionary<string, object> data, string key)
     {
         var result = new List<Dictionary<string, object>>();

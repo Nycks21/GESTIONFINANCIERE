@@ -1,0 +1,39 @@
+.liste-content { padding: 15px; }
+
+.liste-filter-panel {
+    background: #fff;
+    border: 1px solid var(--s-border, #e2e8f0);
+    border-radius: 10px;
+    padding: 16px 20px;
+    margin-bottom: 16px;
+    box-shadow: 0 1px 3px rgba(0,0,0,.04);
+}
+
+.liste-filter-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.lf-field { display: flex; flex-direction: column; }
+.lf-field label {
+    font-size: 11px;
+    font-weight: 600;
+    color: var(--s-muted, #64748b);
+    text-transform: uppercase;
+    letter-spacing: 0.3px;
+    margin-bottom: 4px;
+}
+.lf-field .form-control { height: 34px; font-size: 13px; border-radius: 6px; }
+
+.lf-search { grid-column: span 2; }
+
+.liste-filter-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding-top: 12px;
+    border-top: 1px solid #f1f5f9;
+}
+.liste-filter-actions .toolbar-counter { margin-left: auto; }

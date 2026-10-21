@@ -43,5 +43,17 @@ window.HUB_SECTIONS = [
             { code: 'sites',     nom: 'Sites',          icone: 'fas fa-map-marker-alt',  description: 'Gérer les sites / agences',      action: 'link', href: '../parametrage/sites/sites.aspx' },
             { code: 'taux',      nom: 'Taux de change', icone: 'fas fa-exchange-alt',    description: 'Historique des taux',            action: 'link', href: '../parametrage/taux/taux.aspx' },
         ]
+    },
+    {
+        code: 'STOCK',
+        nom: 'Paramètres Stock',
+        icone: 'fas fa-cubes',
+        ordre: 3,
+        cards: [
+            { code: 'unites',  nom: 'menu.unites',       icone: 'fas fa-ruler',           description: 'Unité de mesure',              action: 'link', href: '/pages/stock/parametres/unites/unites.aspx' },
+            { code: 'categories',     nom: 'menu.categories',          icone: 'fas fa-tags',  description: 'Catégorie des stocks',      action: 'link', href: '/pages/stock/parametres/categories/categories.aspx' },
+            { code: 'emplacements',      nom: 'menu.emplacements', icone: 'fas fa-warehouse',    description: 'Emplacement des stocks',            action: 'link', href: '/pages/stock/parametres/emplacements/emplacements.aspx' },
+        ]
     }
 ];
+

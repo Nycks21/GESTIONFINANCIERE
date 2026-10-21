@@ -1,4 +1,5 @@
 // crud.js — SAISIE (actions CRUD) avec plans dynamiques + équilibre double + dirty tracking
+// ⭐ Mise à jour : gestion du champ MARCHE (ecrMarche)
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
 
@@ -45,7 +46,6 @@ window.addEventListener('beforeunload', function (e) {
 // CONVERSIONS LIGNE
 // ============================================================
 
-// Serveur (PLAN1..PLAN10 + SENS/MONTANT) → Client (compteIdPn + debit/credit)
 function _serverLigneToClient(l) {
     var ordreToKey = buildOrdreToKeyMap();
 
@@ -81,9 +81,6 @@ function _serverLigneToClient(l) {
     return out;
 }
 
-// ============================================================
-// CONVERSION LIGNE → PAYLOAD (client → serveur)
-// ============================================================
 function _clientLigneToPayload(l) {
     var keyToOrdre = buildKeyToOrdreMap();
     var primaire = getPrimaryPlanField();
@@ -127,6 +124,32 @@ function _getDefaultSiteId() {
 }
 
 // ============================================================
+// ⭐ HELPER — SÉLECTION DU MARCHÉ (avec fallback orphelin)
+// ============================================================
+function _applyMarcheToSelect(marcheId) {
+    var mrcSel = document.getElementById('ecrMarche');
+    if (!mrcSel) return;
+
+    // Reset à vide par défaut
+    mrcSel.value = '';
+    if (!marcheId) return;
+
+    // Tentative de sélection dans les options existantes
+    mrcSel.value = marcheId;
+
+    // Si la valeur n'existe pas dans la liste → option dynamique
+    if (mrcSel.value !== marcheId) {
+        var opt = document.createElement('option');
+        opt.value = marcheId;
+        opt.textContent = marcheId + ' (' +
+            (_t('saisie.hint.marche_orphan') || 'marché supprimé ou annulé') + ')';
+        mrcSel.appendChild(opt);
+        mrcSel.value = marcheId;
+        console.warn('[crud] Marché orphelin référencé :', marcheId);
+    }
+}
+
+// ============================================================
 // NOUVELLE ÉCRITURE
 // ============================================================
 function newEcriture() {
@@ -139,12 +162,15 @@ function newEcriture() {
     _setVal('ecrDate', new Date().toISOString().slice(0, 10));
     _setVal('ecrDatePiece', '');
     _setVal('ecrReference', '');
-    // ⭐ NOUVEAUX CHAMPS
     _setVal('ecrReferenceFacture', '');
     _setVal('ecrDateFacture', '');
     _setVal('ecrLibelle', '');
     _setVal('ecrStatut', 'BROUILLON');
     _setVal('ecrCours', '1');
+
+    // ⭐ NOUVEAU : reset du marché
+    var mrcSel = document.getElementById('ecrMarche');
+    if (mrcSel) mrcSel.value = '';
 
     var defaultSiteId = _getDefaultSiteId();
     if (defaultSiteId) _setVal('ecrSite', defaultSiteId);
@@ -217,11 +243,13 @@ async function editEcriture(id) {
         _setVal('ecrDate', ecr.DATE_COMPTABLE);
         _setVal('ecrDatePiece', ecr.DATE_PIECE || '');
         _setVal('ecrReference', ecr.REFERENCE || '');
-        // ⭐ NOUVEAUX CHAMPS
         _setVal('ecrReferenceFacture', ecr.REFERENCE_FACTURE || '');
         _setVal('ecrDateFacture',      ecr.DATE_FACTURE      || '');
         _setVal('ecrLibelle', ecr.LIBELLE);
         _setVal('ecrStatut', ecr.STATUT);
+
+        // ⭐ NOUVEAU : sélection du marché (avec gestion orphelin)
+        _applyMarcheToSelect(ecr.MARCHE);
 
         await loadPeriodes(ecr.EXERCICE_ID);
         _setVal('ecrPeriode', ecr.PERIODE_ID || findPeriodeId(ecr.DATE_COMPTABLE));
@@ -312,7 +340,7 @@ async function saveEcriture(e) {
 
     var siteId = _getVal('ecrSite') || _getDefaultSiteId() || null;
 
-    // ⭐ Payload avec REFERENCE_FACTURE + DATE_FACTURE
+    // ⭐ Payload avec MARCHE
     var payload = {
         id:               AppState.editingId,
         siteId:           siteId,
@@ -324,11 +352,12 @@ async function saveEcriture(e) {
         dateComptable:    _getVal('ecrDate'),
         datePiece:        _getVal('ecrDatePiece'),
         reference:        _getVal('ecrReference').trim(),
-        // ⭐ NOUVEAUX CHAMPS
         referenceFacture: _getVal('ecrReferenceFacture').trim(),
         dateFacture:      _getVal('ecrDateFacture') || null,
         libelle:          libelleFinal,
         statut:           _getVal('ecrStatut'),
+        // ⭐ NOUVEAU : ID du marché (GUID) ou null
+        marche:           _getVal('ecrMarche') || null,
         lignes:           lignesPayload
     };
 
@@ -445,6 +474,7 @@ window.deleteEcriture        = deleteEcriture;
 window.deleteCurrentEcriture = deleteCurrentEcriture;
 window.loadNextNumero        = loadNextNumero;
 window._getDefaultSiteId     = _getDefaultSiteId;
+window._applyMarcheToSelect  = _applyMarcheToSelect;   // ⭐ utilitaire public
 window._serverLigneToClient  = _serverLigneToClient;
 window._clientLigneToPayload = _clientLigneToPayload;
 

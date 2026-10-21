@@ -2,9 +2,6 @@
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
 
-// ============================================================
-// GÉNÉRATION DU FORMULAIRE (champs plans dynamiques)
-// ============================================================
 function renderFormPlanFields() {
     var container = document.getElementById('dynPlanFieldsRow');
     if (!container) return;
@@ -27,9 +24,6 @@ function renderFormPlanFields() {
     container.innerHTML = html;
 }
 
-// ============================================================
-// EN-TÊTE DE GRILLE (dynamique)
-// ============================================================
 function renderGridHead() {
     var row = document.getElementById('marGridHeadRow');
     if (!row) return;
@@ -54,9 +48,6 @@ function renderGridHead() {
     row.innerHTML = html;
 }
 
-// ============================================================
-// RENDU CORPS DE GRILLE
-// ============================================================
 function renderGrid() {
     var tb = document.getElementById('marLignesBody');
     if (!tb) return;
@@ -105,15 +96,13 @@ function _cellPlan(code) {
          + (safe || '—') + '</span></td>';
 }
 
-// ============================================================
-// SÉLECTION LIGNE
-// ============================================================
 function selectLigne(idx) {
     AppState.selectedLigneIndex = idx;
     renderGrid();
     loadLigneIntoForm(idx);
 }
 
+// ⭐ Utilise setMoneyValue() pour les champs monétaires (synchronise data-numeric-value)
 function loadLigneIntoForm(idx) {
     var l = AppState.lignes[idx];
     if (!l) return;
@@ -125,15 +114,20 @@ function loadLigneIntoForm(idx) {
     _setVal('mlArticle',     l.articleId || '');
     _setVal('mlDesignation', l.designation || '');
     _setVal('mlReference',   l.referenceLigne || '');
-    _setVal('mlTaxe',         l.taxe || 0);
-    _setVal('mlMontantLocHT', l.montantLocHT || 0);
-    _setVal('mlMontantRapHT', l.montantRapHT || 0);
-    _setVal('mlDescription',  l.description || '');
+    _setVal('mlTaxe',        l.taxe || 0);
+
+    // ⭐ IMPORTANT : setMoneyValue au lieu de _setVal
+    if (typeof setMoneyValue === 'function') {
+        setMoneyValue('mlMontantLocHT', l.montantLocHT || 0);
+        setMoneyValue('mlMontantRapHT', l.montantRapHT || 0);
+    } else {
+        _setVal('mlMontantLocHT', l.montantLocHT || 0);
+        _setVal('mlMontantRapHT', l.montantRapHT || 0);
+    }
+
+    _setVal('mlDescription', l.description || '');
 }
 
-// ============================================================
-// PEUPLEMENT DES SELECTS DE COMPTES
-// ============================================================
 function populatePlanSelectsForm() {
     var active = getActivePlanFields();
     active.forEach(function (plan) {
@@ -160,9 +154,6 @@ function findCodeCompteByKey(key, compteId) {
     return c ? c.CODE : '';
 }
 
-// ============================================================
-// EXPOSITIONS
-// ============================================================
 window.renderFormPlanFields      = renderFormPlanFields;
 window.renderGridHead            = renderGridHead;
 window.renderGrid                = renderGrid;

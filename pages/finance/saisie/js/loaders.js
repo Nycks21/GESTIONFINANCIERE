@@ -28,6 +28,9 @@ async function loadLookups() {
         AppState.ecritureLinesCache = AppState.ecritureLinesCache || {};
         AppState.expandedEcritures  = AppState.expandedEcritures  || {};
 
+        // ⭐ NOUVEAU : chargement parallèle des marchés
+        await loadMarchesLookup();
+
         populateHeaderSelects();
         populateAuxiliaireOptions();
         renderFormPlanFields();
@@ -43,9 +46,43 @@ async function loadLookups() {
 }
 
 // ============================================================
+// ⭐ NOUVEAU — CHARGEMENT DES MARCHÉS (select ecrMarche)
+// ============================================================
+async function loadMarchesLookup() {
+    AppState.marchesLookup = [];
+
+    if (!API.MARCHES) {
+        console.warn('[loadMarchesLookup] API.MARCHES non défini — select ecrMarche vide');
+        return;
+    }
+
+    try {
+        var url = API.BASE + API.HANDLERS_PATH + API.MARCHES;
+        var resp = await fetch(url);
+        var ct   = (resp.headers.get('content-type') || '').toLowerCase();
+        var text = await resp.text();
+
+        // ⭐ Détection robuste : HTML au lieu de JSON
+        if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<') {
+            console.warn('[loadMarchesLookup] Handler indisponible (HTTP ' + resp.status +
+                         ') — select ecrMarche vide');
+            return;
+        }
+
+        var data = JSON.parse(text);
+        if (data.success) {
+            AppState.marchesLookup = data.marches || [];
+            console.log('[loadMarchesLookup] ' + AppState.marchesLookup.length + ' marché(s) chargé(s)');
+        } else {
+            console.warn('[loadMarchesLookup] Réponse non OK :', data.message);
+        }
+    } catch (err) {
+        console.warn('[loadMarchesLookup] Ignoré :', err.message || err);
+    }
+}
+
+// ============================================================
 // PEUPLEMENT DES SELECTS D'ENTÊTE
-//   ⭐ Le select #journal-filter est ignoré si Vue est présent
-//      (Vue le gère via v-for).
 // ============================================================
 function populateHeaderSelects() {
     // Sites
@@ -73,7 +110,7 @@ function populateHeaderSelects() {
         });
     }
 
-    // ⭐ Journal filter (LIST) — SKIP si Vue gère
+    // Journal filter (LIST) — SKIP si Vue gère
     if (!window._VueSaisieList) {
         var jf = document.getElementById('journal-filter');
         if (jf) {
@@ -116,6 +153,34 @@ function populateHeaderSelects() {
         });
     }
 
+    // ⭐ NOUVEAU : Marchés (ecrMarche)
+    var mrc = document.getElementById('ecrMarche');
+    if (mrc) {
+        mrc.innerHTML = '<option value="">— Aucun marché —</option>';
+        (AppState.marchesLookup || []).forEach(function (x) {
+            var o = document.createElement('option');
+
+            // ⭐ value = ID du marché (GUID) — stocké dans FECRITURE.MARCHE
+            o.value = x.ID;
+
+            // ⭐ text = NUMERO — DESCRIPTION (Fournisseur)
+            var label = x.NUMERO;
+            if (x.DESCRIPTION)     label += ' — ' + x.DESCRIPTION;
+            if (x.FOURNISSEUR_NOM) label += ' (' + x.FOURNISSEUR_NOM + ')';
+            o.textContent = label;
+
+            // Attributs utiles pour debug
+            o.setAttribute('data-marche-id',     x.ID);
+            o.setAttribute('data-marche-numero', x.NUMERO);
+            o.setAttribute('data-statut',        x.STATUT);
+
+            mrc.appendChild(o);
+        });
+
+        console.log('[populateHeaderSelects] ecrMarche →',
+                    (AppState.marchesLookup || []).length, 'option(s)');
+    }
+
     // Modes
     var mo = document.getElementById('flMode');
     if (mo) {
@@ -138,6 +203,34 @@ function populateHeaderSelects() {
             o.textContent = x.LIBELLE;
             sb.appendChild(o);
         });
+    }
+}
+
+// ⭐ NOUVEAU : helper public pour rafraîchir le select après création/édition d'un marché
+async function refreshMarchesLookup() {
+    await loadMarchesLookup();
+    var mrc = document.getElementById('ecrMarche');
+    if (!mrc) return;
+
+    var current = mrc.value;
+
+    mrc.innerHTML = '<option value="">— Aucun marché —</option>';
+    (AppState.marchesLookup || []).forEach(function (x) {
+        var o = document.createElement('option');
+        o.value = x.ID;
+        var label = x.NUMERO;
+        if (x.DESCRIPTION)     label += ' — ' + x.DESCRIPTION;
+        if (x.FOURNISSEUR_NOM) label += ' (' + x.FOURNISSEUR_NOM + ')';
+        o.textContent = label;
+        o.setAttribute('data-marche-id', x.ID);
+        o.setAttribute('data-marche-numero', x.NUMERO);
+        o.setAttribute('data-statut', x.STATUT);
+        mrc.appendChild(o);
+    });
+
+    // Restaure la sélection précédente si elle existe encore
+    if (current) {
+        mrc.value = current;
     }
 }
 
@@ -193,7 +286,7 @@ function populateAuxiliaireOptions(filterByPlanElementId, preserveValue) {
 }
 
 // ============================================================
-// PÉRIODES (robuste — ne plante pas si handler absent)
+// PÉRIODES (robuste)
 // ============================================================
 async function loadPeriodes(exerciceId) {
     AppState.periodes = [];
@@ -207,11 +300,9 @@ async function loadPeriodes(exerciceId) {
         var ct   = (resp.headers.get('content-type') || '').toLowerCase();
         var text = await resp.text();
 
-        // ⭐ Détection : HTML au lieu de JSON → handler manquant ou erreur serveur
         if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<') {
-            console.warn('[loadPeriodes] Handler indisponible (HTTP ' + resp.status +
-                         ') — les périodes ne sont pas chargées. Vérifiez GetExercicesPeriodes.ashx');
-            return;  // ⭐ Silencieux : la saisie reste utilisable sans périodes
+            console.warn('[loadPeriodes] Handler indisponible (HTTP ' + resp.status + ')');
+            return;
         }
 
         var data = JSON.parse(text);
@@ -237,8 +328,6 @@ function findPeriodeId(dateStr) {
         }
     }
 
-    // ⭐ Fallback : exercice en cours (le serveur acceptera PERIODE_ID = EXERCICE_ID
-    //    si le handler de sauvegarde tolère cette simplification)
     var exerciceId = _getVal('ecrExercice');
     if (exerciceId) return exerciceId;
     return '';
@@ -271,9 +360,6 @@ async function loadAllComptesActifs() {
     populatePlanSelectsForm();
 }
 
-// ============================================================
-// RÉSOLUTION D'UN CODE COMPTE
-// ============================================================
 function resolvePlanCodeByOrdre(ordre, compteId) {
     if (!compteId) return '';
     var arr = AppState.comptesParPlan[ordre] || [];
@@ -284,7 +370,7 @@ function resolvePlanCodeByOrdre(ordre, compteId) {
 }
 
 // ============================================================
-// ÉCRITURES — LISTE (Bridge Vue / Fallback vanilla)
+// ÉCRITURES — LISTE
 // ============================================================
 var ecrituresListRequestId = 0;
 
@@ -292,7 +378,6 @@ async function loadEcritures(opts) {
     opts = opts || {};
     var silent = !!opts.silent;
 
-    // ⭐ Si Vue est présent, déléguer
     if (window._VueSaisieList && typeof window._VueSaisieList.load === 'function') {
         if (!silent) showSpinner();
         try {
@@ -303,7 +388,6 @@ async function loadEcritures(opts) {
         return;
     }
 
-    // ─── Fallback vanilla ───
     var requestId = ++ecrituresListRequestId;
     if (!silent) showSpinner();
 
@@ -369,11 +453,7 @@ function showEcrituresListError() {
     if (counter) counter.textContent = '0 ' + _t('saisie.counter_unit');
 }
 
-// ============================================================
-// RENDU DE LA LISTE (fallback vanilla — no-op si Vue)
-// ============================================================
 function renderEcrituresList() {
-    // ⭐ Si Vue est présent, il gère déjà le rendu
     if (window._VueSaisieList) return;
 
     var tb = document.getElementById('ecrituresBody');
@@ -436,9 +516,6 @@ function renderEcrituresList() {
     tb.innerHTML = html;
 }
 
-// ============================================================
-// CONSTRUCTION DE LA SOUS-LIGNE (fallback vanilla)
-// ============================================================
 function buildEcritureLinesRow(ecritureId, lignes) {
     var plans = getActivePlanFields();
 
@@ -473,13 +550,11 @@ function buildEcritureLinesRow(ecritureId, lignes) {
 
             bodyHtml += '<tr style="border-bottom:1px solid #e9ecef;">';
             bodyHtml += '<td style="text-align:center;color:#94A3B8;">' + (i + 1) + '</td>';
-            // ⭐ Utilisation de \u2014 pour "—"
             bodyHtml += '<td>' + escapeHtml(l.AUXILIAIRE || '\u2014') + '</td>';
 
             plans.forEach(function (p) {
                 var val = l['PLAN' + p.ordre];
                 var code = val ? resolvePlanCodeByOrdre(p.ordre, val) : '';
-                // ⭐ Utilisation de \u2014
                 bodyHtml += '<td><span class="cell-badge" title="' + escapeHtml(code) + '">'
                           + (escapeHtml(code) || '\u2014') + '</span></td>';
             });
@@ -508,7 +583,6 @@ function buildEcritureLinesRow(ecritureId, lignes) {
         return s + (sens === 'C' ? (parseFloat(x.MONTANT_DEVISE || 0) || 0) : 0);
     }, 0);
 
-    // ⭐ \u2014 = — , \u00B7 = ·
     var summaryHtml = '<div style="margin-top:8px;font-size:11px;color:#6c757d;">'
         + lignes.length + ' ' + _t('saisie.lines_count_unit') + ' \u2014 '
         + _t('saisie.col.debit') + ' : '
@@ -540,19 +614,14 @@ function buildEcritureLinesRow(ecritureId, lignes) {
         + '</tr>';
 }
 
-// ============================================================
-// EXPANSION / RÉDUCTION D'UNE ÉCRITURE (Bridge Vue)
-// ============================================================
 async function toggleEcritureLines(ecritureId, e) {
     if (e) e.stopPropagation();
 
-    // ⭐ Si Vue est présent, déléguer
     if (window._VueSaisieList && typeof window._VueSaisieList.toggleLines === 'function') {
         window._VueSaisieList.toggleLines(ecritureId);
         return;
     }
 
-    // ─── Fallback vanilla ───
     var btn = document.querySelector('button[data-toggle-ecr="' + escritureIdSafe(ecritureId) + '"]');
     var existingSub = document.querySelector('tr.ecr-sub-row[data-ecriture-id="' + escritureIdSafe(ecritureId) + '"]');
 
@@ -603,9 +672,6 @@ function escritureIdSafe(id) {
     return String(id || '').replace(/[^a-zA-Z0-9\-]/g, '');
 }
 
-// ============================================================
-// COMPTEUR DE LIGNES (dans la grille de saisie)
-// ============================================================
 function _refreshLinesCounter() {
     var el = document.getElementById('ecrLinesCounter');
     if (!el) return;
@@ -622,6 +688,8 @@ function _refreshLinesCounter() {
 // EXPOSITIONS
 // ============================================================
 window.loadLookups               = loadLookups;
+window.loadMarchesLookup         = loadMarchesLookup;    // ⭐ NOUVEAU
+window.refreshMarchesLookup      = refreshMarchesLookup; // ⭐ NOUVEAU
 window.populateHeaderSelects     = populateHeaderSelects;
 window.populateAuxiliaireOptions = populateAuxiliaireOptions;
 window.loadPeriodes              = loadPeriodes;

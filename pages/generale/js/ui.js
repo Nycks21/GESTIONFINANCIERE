@@ -32,11 +32,36 @@ function renderHub() {
     var container = document.getElementById('hubContainer');
     if (!container) return;
 
-    var sections = (AppState.sections && AppState.sections.length > 0)
-        ? AppState.sections
-        : (window.HUB_SECTIONS || []);
+    var dbSections = AppState.sections || [];
+    var configSections = window.HUB_SECTIONS || [];
 
-    sections = sections.slice().sort(function (a, b) {
+    // ⭐ 1. Fusion des sections de la BDD et de config.js
+    var sections = [];
+    var processedCodes = {};
+
+    // Ajouter les sections venant de la BDD
+    dbSections.forEach(function(sec) {
+        var code = (sec.CODE || sec.code || '').toUpperCase();
+        processedCodes[code] = true;
+        sections.push(sec);
+    });
+
+    // Ajouter les sections de config.js qui ne sont PAS dans la BDD (ex: STOCK)
+    configSections.forEach(function(sec) {
+        var code = (sec.code || '').toUpperCase();
+        if (!processedCodes[code]) {
+            sections.push({
+                CODE: sec.code,
+                NOM: sec.nom,
+                ICONE: sec.icone,
+                ORDRE: sec.ordre || 99
+            });
+            processedCodes[code] = true;
+        }
+    });
+
+    // ⭐ 2. Tri par ordre
+    sections.sort(function (a, b) {
         return (a.ORDRE || a.ordre || 0) - (b.ORDRE || b.ordre || 0);
     });
 
@@ -46,10 +71,13 @@ function renderHub() {
         var sectionNom   = section.NOM   || section.nom   || '';
         var sectionIcone = section.ICONE || section.icone || 'fas fa-folder';
 
-        var hubSection = (window.HUB_SECTIONS || []).find(function (s) {
+        var hubSection = configSections.find(function (s) {
             return (s.code || '').toUpperCase() === sectionCode.toUpperCase();
         });
         var cards = hubSection ? (hubSection.cards || []) : [];
+
+        // Si une section existe en BDD mais n'a pas de cartes dans config.js, on l'ignore
+        if (cards.length === 0) return;
 
         html += '<div class="hub-section">';
         html += '  <div class="hub-section-head">';
