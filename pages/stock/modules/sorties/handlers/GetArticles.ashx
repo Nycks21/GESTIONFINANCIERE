@@ -1,5 +1,4 @@
 <%@ WebHandler Language="C#" Class="GetArticles" %>
-
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
@@ -15,14 +14,12 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
         ctx.Response.Charset = "utf-8";
         ctx.Response.Cache.SetNoStore();
 
-// ✅ Authentification : tous les rôles authentifiés (0 à 4)
         if (!AuthHelper.RequireApiAuth(ctx, -1))
         {
             ctx.Response.StatusCode = 403;
             ctx.Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");
             return;
         }
-
 
         try
         {
@@ -38,30 +35,31 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
             if (pageSize < 1) pageSize = 10;
             if (pageSize > 100 && pageSize != 999999) pageSize = 100;
 
-            string search = (ctx.Request.QueryString["search"] ?? "").Trim();
+            string search   = (ctx.Request.QueryString["search"]   ?? "").Trim();
             string category = (ctx.Request.QueryString["category"] ?? "").Trim();
-            string status = (ctx.Request.QueryString["status"] ?? "").Trim();
-            string sort = (ctx.Request.QueryString["sort"] ?? "NOM").Trim();
-            string order = (ctx.Request.QueryString["order"] ?? "ASC").Trim();
+            string status   = (ctx.Request.QueryString["status"]   ?? "").Trim();
+            string sort     = (ctx.Request.QueryString["sort"]     ?? "NOM").Trim();
+            string order    = (ctx.Request.QueryString["order"]    ?? "ASC").Trim();
 
             var articles = new List<object>();
 
-                        string whereClause = @"
-                                WHERE a.DELETION_AT IS NULL
-                                    AND EXISTS (
-                                            SELECT 1
-                                            FROM MLENTREE le
-                                            INNER JOIN SENTREE be ON be.ID = le.BON_ENTREE_ID
-                                            WHERE le.ARTICLE_ID = a.ID
-                                                AND le.DELETION_AT IS NULL
-                                                AND be.STATUT = 'VALIDE'
-                                                AND be.DELETION_AT IS NULL
-                                    )
-                                    AND ISNULL((
-                                            SELECT SUM(s.QUANTITE_ACTUELLE)
-                                            FROM SSTOCK s
-                                            WHERE s.ARTICLE_ID = a.ID AND s.DELETION_AT IS NULL
-                                    ), 0) > 0 ";
+            // ⭐ BUG corrigé : SFOURNISSEUR → FTIERS
+            string whereClause = @"
+                WHERE a.DELETION_AT IS NULL
+                  AND EXISTS (
+                      SELECT 1
+                      FROM MLENTREE le
+                      INNER JOIN SENTREE be ON be.ID = le.BON_ENTREE_ID
+                      WHERE le.ARTICLE_ID = a.ID
+                        AND le.DELETION_AT IS NULL
+                        AND be.STATUT = 'VALIDE'
+                        AND be.DELETION_AT IS NULL
+                  )
+                  AND ISNULL((
+                      SELECT SUM(s.QUANTITE_ACTUELLE)
+                      FROM SSTOCK s
+                      WHERE s.ARTICLE_ID = a.ID AND s.DELETION_AT IS NULL
+                  ), 0) > 0 ";
             if (!string.IsNullOrEmpty(search))
             {
                 whereClause += " AND (LOWER(a.CODE) LIKE @search OR LOWER(a.NOM) LIKE @search OR LOWER(a.DESCRIPTION) LIKE @search) ";
@@ -78,24 +76,26 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
             string sortField = "a.NOM";
             switch ((sort ?? "NOM").ToUpperInvariant())
             {
-                case "CODE": sortField = "a.CODE"; break;
-                case "CATEGORIE": sortField = "c.NOM"; break;
-                case "FOURNISSEUR": sortField = "f.NOM"; break;
-                case "UNITE": sortField = "u.NOM"; break;
+                case "CODE":             sortField = "a.CODE"; break;
+                case "CATEGORIE":        sortField = "c.NOM"; break;
+                case "FOURNISSEUR":      sortField = "f.NOM"; break;
+                case "UNITE":            sortField = "u.NOM"; break;
                 case "STOCK_DISPONIBLE": sortField = "STOCK_DISPONIBLE"; break;
-                case "SEUIL_ALERTE": sortField = "a.SEUIL_ALERTE"; break;
-                case "STATUT_STOCK": sortField = "STATUT_STOCK"; break;
-                default: sortField = "a.NOM"; break;
+                case "SEUIL_ALERTE":     sortField = "a.SEUIL_ALERTE"; break;
+                case "STATUT_STOCK":     sortField = "STATUT_STOCK"; break;
+                default:                 sortField = "a.NOM"; break;
             }
 
+            // ⭐ FTIERS remplace SFOURNISSEUR
             string sqlCount = @"
                 SELECT COUNT(*)
                 FROM MARTICLE a
                 LEFT JOIN SCATEGORIE c ON c.ID = a.CATEGORIE_ID
-                LEFT JOIN SUNITE u ON u.ID = a.UNITE_MESURE_ID
-                LEFT JOIN SFOURNISSEUR f ON f.ID = a.FOURNISSEUR_PREFERE_ID
+                LEFT JOIN SUNITE      u ON u.ID = a.UNITE_MESURE_ID
+                LEFT JOIN FTIERS      f ON f.ID = a.FOURNISSEUR_PREFERE_ID
                 " + whereClause;
 
+            // ⭐ FTIERS remplace SFOURNISSEUR
             string sqlList = @"
                 SELECT
                     a.ID, a.CODE, a.CODE_BARRE, a.NOM, a.DESCRIPTION,
@@ -113,8 +113,8 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
                     END AS STATUT_STOCK
                 FROM MARTICLE a
                 LEFT JOIN SCATEGORIE c ON c.ID = a.CATEGORIE_ID
-                LEFT JOIN SUNITE u ON u.ID = a.UNITE_MESURE_ID
-                LEFT JOIN SFOURNISSEUR f ON f.ID = a.FOURNISSEUR_PREFERE_ID
+                LEFT JOIN SUNITE      u ON u.ID = a.UNITE_MESURE_ID
+                LEFT JOIN FTIERS      f ON f.ID = a.FOURNISSEUR_PREFERE_ID
                 " + whereClause + @"
                 ORDER BY " + sortField + " " + (string.Equals(order, "DESC", StringComparison.OrdinalIgnoreCase) ? "DESC" : "ASC") + @"
                 OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
@@ -124,9 +124,9 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
             using (var countCmd = new SqlCommand(sqlCount, conn))
             {
                 conn.Open();
-                if (!string.IsNullOrEmpty(search)) countCmd.Parameters.AddWithValue("@search", "%" + search.ToLowerInvariant() + "%");
+                if (!string.IsNullOrEmpty(search))   countCmd.Parameters.AddWithValue("@search", "%" + search.ToLowerInvariant() + "%");
                 if (!string.IsNullOrEmpty(category)) countCmd.Parameters.AddWithValue("@category", category);
-                if (!string.IsNullOrEmpty(status)) countCmd.Parameters.AddWithValue("@status", status.ToUpperInvariant());
+                if (!string.IsNullOrEmpty(status))   countCmd.Parameters.AddWithValue("@status", status.ToUpperInvariant());
                 total = (int)countCmd.ExecuteScalar();
             }
 
@@ -138,9 +138,9 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
             using (var conn = new SqlConnection(connStr))
             using (var cmd = new SqlCommand(sqlList, conn))
             {
-                if (!string.IsNullOrEmpty(search)) cmd.Parameters.AddWithValue("@search", "%" + search.ToLowerInvariant() + "%");
+                if (!string.IsNullOrEmpty(search))   cmd.Parameters.AddWithValue("@search", "%" + search.ToLowerInvariant() + "%");
                 if (!string.IsNullOrEmpty(category)) cmd.Parameters.AddWithValue("@category", category);
-                if (!string.IsNullOrEmpty(status)) cmd.Parameters.AddWithValue("@status", status.ToUpperInvariant());
+                if (!string.IsNullOrEmpty(status))   cmd.Parameters.AddWithValue("@status", status.ToUpperInvariant());
                 cmd.Parameters.AddWithValue("@offset", offset);
                 cmd.Parameters.AddWithValue("@pageSize", pageSize);
 
@@ -151,27 +151,27 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
                     {
                         pageArticles.Add(new
                         {
-                            ID = reader["ID"].ToString(),
-                            CODE = reader["CODE"].ToString(),
-                            CODE_BARRE = reader["CODE_BARRE"] == DBNull.Value ? "" : reader["CODE_BARRE"].ToString(),
-                            NOM = reader["NOM"].ToString(),
-                            DESCRIPTION = reader["DESCRIPTION"] == DBNull.Value ? "" : reader["DESCRIPTION"].ToString(),
-                            CATEGORIE_ID = reader["CATEGORIE_ID"] == DBNull.Value ? null : reader["CATEGORIE_ID"].ToString(),
-                            CATEGORIE = reader["CATEGORIE"] == DBNull.Value ? "" : reader["CATEGORIE"].ToString(),
-                            UNITE_MESURE_ID = reader["UNITE_MESURE_ID"] == DBNull.Value ? null : reader["UNITE_MESURE_ID"].ToString(),
-                            UNITE = reader["UNITE"] == DBNull.Value ? "" : reader["UNITE"].ToString(),
+                            ID                     = reader["ID"].ToString(),
+                            CODE                   = reader["CODE"].ToString(),
+                            CODE_BARRE             = reader["CODE_BARRE"] == DBNull.Value ? "" : reader["CODE_BARRE"].ToString(),
+                            NOM                    = reader["NOM"].ToString(),
+                            DESCRIPTION            = reader["DESCRIPTION"] == DBNull.Value ? "" : reader["DESCRIPTION"].ToString(),
+                            CATEGORIE_ID           = reader["CATEGORIE_ID"] == DBNull.Value ? null : reader["CATEGORIE_ID"].ToString(),
+                            CATEGORIE              = reader["CATEGORIE"] == DBNull.Value ? "" : reader["CATEGORIE"].ToString(),
+                            UNITE_MESURE_ID        = reader["UNITE_MESURE_ID"] == DBNull.Value ? null : reader["UNITE_MESURE_ID"].ToString(),
+                            UNITE                  = reader["UNITE"] == DBNull.Value ? "" : reader["UNITE"].ToString(),
                             FOURNISSEUR_PREFERE_ID = reader["FOURNISSEUR_PREFERE_ID"] == DBNull.Value ? null : reader["FOURNISSEUR_PREFERE_ID"].ToString(),
-                            FOURNISSEUR = reader["FOURNISSEUR"] == DBNull.Value ? "" : reader["FOURNISSEUR"].ToString(),
-                            EMPLACEMENT_ID = reader["EMPLACEMENT_ID"] == DBNull.Value ? null : reader["EMPLACEMENT_ID"].ToString(),
-                            SEUIL_MIN = Convert.ToDecimal(reader["SEUIL_MIN"]),
-                            SEUIL_ALERTE = Convert.ToDecimal(reader["SEUIL_ALERTE"]),
-                            POIDS = reader["POIDS"] == DBNull.Value ? (decimal?)null : Convert.ToDecimal(reader["POIDS"]),
-                            VOLUME = reader["VOLUME"] == DBNull.Value ? (decimal?)null : Convert.ToDecimal(reader["VOLUME"]),
-                            ACTIVE = Convert.ToBoolean(reader["ACTIVE"]),
-                            EST_SERVICE = Convert.ToBoolean(reader["EST_SERVICE"]),
-                            EST_PERISSABLE = Convert.ToBoolean(reader["EST_PERISSABLE"]),
-                            STOCK_DISPONIBLE = Convert.ToDecimal(reader["STOCK_DISPONIBLE"]),
-                            STATUT_STOCK = reader["STATUT_STOCK"].ToString()
+                            FOURNISSEUR            = reader["FOURNISSEUR"] == DBNull.Value ? "" : reader["FOURNISSEUR"].ToString(),
+                            EMPLACEMENT_ID         = reader["EMPLACEMENT_ID"] == DBNull.Value ? null : reader["EMPLACEMENT_ID"].ToString(),
+                            SEUIL_MIN              = Convert.ToDecimal(reader["SEUIL_MIN"]),
+                            SEUIL_ALERTE           = Convert.ToDecimal(reader["SEUIL_ALERTE"]),
+                            POIDS                  = reader["POIDS"] == DBNull.Value ? (decimal?)null : Convert.ToDecimal(reader["POIDS"]),
+                            VOLUME                 = reader["VOLUME"] == DBNull.Value ? (decimal?)null : Convert.ToDecimal(reader["VOLUME"]),
+                            ACTIVE                 = Convert.ToBoolean(reader["ACTIVE"]),
+                            EST_SERVICE            = Convert.ToBoolean(reader["EST_SERVICE"]),
+                            EST_PERISSABLE         = Convert.ToBoolean(reader["EST_PERISSABLE"]),
+                            STOCK_DISPONIBLE       = Convert.ToDecimal(reader["STOCK_DISPONIBLE"]),
+                            STATUT_STOCK           = reader["STATUT_STOCK"].ToString()
                         });
                     }
                 }
@@ -186,15 +186,26 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
                 totalPages = totalPages
             }));
         }
+        catch (SqlException sex)
+        {
+            ctx.Response.StatusCode = 500;
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+            {
+                success  = false,
+                sqlError = sex.Number,
+                message  = "Erreur SQL (" + sex.Number + ") : " + sex.Message.Replace("\"", "\\\"")
+            }));
+        }
         catch (Exception ex)
         {
             ctx.Response.StatusCode = 500;
-            ctx.Response.Write(new JavaScriptSerializer().Serialize(new { success = false, message = ex.Message.Replace("\"", "\\\"") }));
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+            {
+                success = false,
+                message = ex.Message.Replace("\"", "\\\"")
+            }));
         }
     }
 
-    public bool IsReusable
-    {
-        get { return false; }
-    }
+    public bool IsReusable { get { return false; } }
 }

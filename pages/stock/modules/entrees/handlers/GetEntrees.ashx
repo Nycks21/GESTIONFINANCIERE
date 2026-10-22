@@ -14,7 +14,6 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
         ctx.Response.Charset = "utf-8";
         ctx.Response.Cache.SetNoStore();
 
-        // ✅ Authentification : tous les rôles authentifiés (0 à 4)
         if (!AuthHelper.RequireApiAuth(ctx, -1))
         {
             ctx.Response.StatusCode = 403;
@@ -40,6 +39,27 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
             if (!string.IsNullOrEmpty(ctx.Request["sort"])) sort = ctx.Request["sort"];
             if (!string.IsNullOrEmpty(ctx.Request["order"])) order = ctx.Request["order"];
 
+            // ─── Bornes de sécurité ───
+            if (page < 1) page = 1;
+            if (pageSize < 1) pageSize = 10;
+            if (pageSize > 500) pageSize = 500;
+
+            // ─── Whitelist ORDER BY (anti-injection SQL) ───
+            string sortColumn;
+            switch ((sort ?? "").ToUpperInvariant())
+            {
+                case "NUMERO":       sortColumn = "e.NUMERO";       break;
+                case "DATE_ENTREE":  sortColumn = "e.DATE_ENTREE";  break;
+                case "STATUT":       sortColumn = "e.STATUT";       break;
+                case "TOTAL_TTC":    sortColumn = "e.TOTAL_TTC";    break;
+                case "TOTAL_HT":     sortColumn = "e.TOTAL_HT";     break;
+                case "FOURNISSEUR":  sortColumn = "f.NOM";          break;
+                default:             sortColumn = "e.DATE_ENTREE";  break;
+            }
+            string sortDirection = string.Equals(order, "ASC", StringComparison.OrdinalIgnoreCase)
+                                   ? "ASC" : "DESC";
+            string orderBy = "ORDER BY " + sortColumn + " " + sortDirection;
+
             string connStr = AuthHelper.ConnectionString;
             var resultList = new List<Dictionary<string, object>>();
 
@@ -47,7 +67,7 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
             {
                 conn.Open();
 
-                // Construction de la clause WHERE
+                // ⭐ FTIERS remplace SFOURNISSEUR
                 string where = "WHERE e.DELETION_AT IS NULL";
                 if (!string.IsNullOrEmpty(search))
                     where += " AND (e.NUMERO LIKE @search OR f.NOM LIKE @search)";
@@ -56,36 +76,47 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
                 if (!string.IsNullOrEmpty(statut))
                     where += " AND e.STATUT = @statut";
 
-                string orderBy = "ORDER BY " + sort + " " + order;
+                // ─── COUNT ───
+                string countSql =
+                    "SELECT COUNT(*) FROM SENTREE e " +
+                    "LEFT JOIN FTIERS f ON e.FOURNISSEUR_ID = f.ID AND f.DELETION_AT IS NULL " +
+                    where;
 
-                // Récupération du nombre total
-                string countSql = "SELECT COUNT(*) FROM SENTREE e LEFT JOIN SFOURNISSEUR f ON e.FOURNISSEUR_ID = f.ID " + where;
                 int total = 0;
                 using (var cmd = new SqlCommand(countSql, conn))
                 {
-                    if (!string.IsNullOrEmpty(search)) cmd.Parameters.AddWithValue("@search", "%" + search + "%");
-                    if (!string.IsNullOrEmpty(fournisseurId)) cmd.Parameters.AddWithValue("@fournisseurId", fournisseurId);
-                    if (!string.IsNullOrEmpty(statut)) cmd.Parameters.AddWithValue("@statut", statut);
+                    if (!string.IsNullOrEmpty(search))
+                        cmd.Parameters.AddWithValue("@search", "%" + search + "%");
+                    if (!string.IsNullOrEmpty(fournisseurId))
+                        cmd.Parameters.AddWithValue("@fournisseurId", fournisseurId);
+                    if (!string.IsNullOrEmpty(statut))
+                        cmd.Parameters.AddWithValue("@statut", statut);
                     total = (int)cmd.ExecuteScalar();
                 }
 
-                // Requête de données paginée
+                // ─── DATA (FTIERS remplace SFOURNISSEUR) ───
                 string dataSql = @"
-                    SELECT e.ID, e.NUMERO, e.DATE_ENTREE, e.STATUT, e.TOTAL_HT, e.TOTAL_TTC, e.REFERENCE, e.NOTES, e.CREATED_AT,
-                           f.ID AS FOURNISSEUR_ID, f.NOM AS FOURNISSEUR
+                    SELECT e.ID, e.NUMERO, e.DATE_ENTREE, e.STATUT,
+                           e.TOTAL_HT, e.TOTAL_TTC, e.REFERENCE, e.NOTES, e.CREATED_AT,
+                           f.ID  AS FOURNISSEUR_ID,
+                           f.NOM AS FOURNISSEUR
                     FROM SENTREE e
-                    LEFT JOIN SFOURNISSEUR f ON e.FOURNISSEUR_ID = f.ID
+                    LEFT JOIN FTIERS f
+                        ON f.ID = e.FOURNISSEUR_ID
+                       AND f.DELETION_AT IS NULL
                     " + where + @"
                     " + orderBy + @"
                     OFFSET @offset ROWS FETCH NEXT @pageSize ROWS ONLY";
 
-                // Lire les bons dans une liste temporaire
                 var tempList = new List<Dictionary<string, object>>();
                 using (var cmd = new SqlCommand(dataSql, conn))
                 {
-                    if (!string.IsNullOrEmpty(search)) cmd.Parameters.AddWithValue("@search", "%" + search + "%");
-                    if (!string.IsNullOrEmpty(fournisseurId)) cmd.Parameters.AddWithValue("@fournisseurId", fournisseurId);
-                    if (!string.IsNullOrEmpty(statut)) cmd.Parameters.AddWithValue("@statut", statut);
+                    if (!string.IsNullOrEmpty(search))
+                        cmd.Parameters.AddWithValue("@search", "%" + search + "%");
+                    if (!string.IsNullOrEmpty(fournisseurId))
+                        cmd.Parameters.AddWithValue("@fournisseurId", fournisseurId);
+                    if (!string.IsNullOrEmpty(statut))
+                        cmd.Parameters.AddWithValue("@statut", statut);
                     cmd.Parameters.AddWithValue("@offset", (page - 1) * pageSize);
                     cmd.Parameters.AddWithValue("@pageSize", pageSize);
 
@@ -95,24 +126,25 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
                         {
                             var obj = new Dictionary<string, object>();
                             string entreeId = reader["ID"].ToString();
-                            obj["ID"] = entreeId;
-                            obj["NUMERO"] = reader["NUMERO"].ToString();
-                            obj["DATE_ENTREE"] = reader["DATE_ENTREE"];
-                            obj["STATUT"] = reader["STATUT"].ToString();
-                            obj["TOTAL_HT"] = reader["TOTAL_HT"];
-                            obj["TOTAL_TTC"] = reader["TOTAL_TTC"];
-                            obj["REFERENCE"] = reader["REFERENCE"] != DBNull.Value ? reader["REFERENCE"].ToString() : "";
-                            obj["NOTES"] = reader["NOTES"] != DBNull.Value ? reader["NOTES"].ToString() : "";
-                            obj["CREATED_AT"] = reader["CREATED_AT"];
-                            obj["FOURNISSEUR_ID"] = reader["FOURNISSEUR_ID"] != DBNull.Value ? reader["FOURNISSEUR_ID"].ToString() : null;
-                            obj["FOURNISSEUR"] = reader["FOURNISSEUR"] != DBNull.Value ? reader["FOURNISSEUR"].ToString() : "";
-                            // Lignes chargées plus tard
+                            obj["ID"]           = entreeId;
+                            obj["NUMERO"]       = reader["NUMERO"].ToString();
+                            obj["DATE_ENTREE"]  = reader["DATE_ENTREE"];
+                            obj["STATUT"]       = reader["STATUT"].ToString();
+                            obj["TOTAL_HT"]     = reader["TOTAL_HT"];
+                            obj["TOTAL_TTC"]    = reader["TOTAL_TTC"];
+                            obj["REFERENCE"]    = reader["REFERENCE"] != DBNull.Value ? reader["REFERENCE"].ToString() : "";
+                            obj["NOTES"]        = reader["NOTES"]     != DBNull.Value ? reader["NOTES"].ToString()     : "";
+                            obj["CREATED_AT"]   = reader["CREATED_AT"];
+                            obj["FOURNISSEUR_ID"] = reader["FOURNISSEUR_ID"] != DBNull.Value
+                                                    ? reader["FOURNISSEUR_ID"].ToString() : null;
+                            obj["FOURNISSEUR"]  = reader["FOURNISSEUR"] != DBNull.Value
+                                                    ? reader["FOURNISSEUR"].ToString() : "";
                             tempList.Add(obj);
                         }
                     }
                 }
 
-                // Maintenant, charger les lignes pour chaque bon (le DataReader précédent est fermé)
+                // ─── Lignes par bon ───
                 foreach (var obj in tempList)
                 {
                     string entreeId = obj["ID"].ToString();
@@ -120,15 +152,28 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
                     resultList.Add(obj);
                 }
 
-                int totalPages = (int)Math.Ceiling((double)total / pageSize);
+                int totalPages = pageSize > 0
+                    ? (int)Math.Ceiling((double)total / pageSize)
+                    : 0;
+
                 var response = new Dictionary<string, object>();
-                response["success"] = true;
-                response["Entrees"] = resultList;
-                response["total"] = total;
+                response["success"]    = true;
+                response["Entrees"]    = resultList;
+                response["total"]      = total;
                 response["totalPages"] = totalPages;
 
                 ctx.Response.Write(new JavaScriptSerializer().Serialize(response));
             }
+        }
+        catch (SqlException sex)
+        {
+            ctx.Response.StatusCode = 500;
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(new
+            {
+                success   = false,
+                sqlError  = sex.Number,
+                message   = "Erreur SQL (" + sex.Number + ") : " + sex.Message.Replace("\"", "\\\"")
+            }));
         }
         catch (Exception ex)
         {
@@ -146,13 +191,23 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
         var lignes = new List<Dictionary<string, object>>();
 
         string sql = @"
-                 SELECT l.ARTICLE_ID, a.CODE AS ARTICLE_CODE, a.NOM AS ARTICLE_NOM,
-                     l.QUANTITE, l.PRIX_UNITAIRE_HT, l.TVA_TX, l.PRIX_UNITAIRE_TTC,
-                     l.TOTAL_HT, l.TOTAL_TVA, l.TOTAL_TTC
-                 FROM MLENTREE l
-                LEFT JOIN MARTICLE a ON a.ID = l.ARTICLE_ID
-            WHERE l.BON_ENTREE_ID = @bonEntreeId AND l.DELETION_AT IS NULL
-            ORDER BY ARTICLE_ID";
+            SELECT l.ARTICLE_ID,
+                   a.CODE AS ARTICLE_CODE,
+                   a.NOM  AS ARTICLE_NOM,
+                   l.QUANTITE,
+                   l.PRIX_UNITAIRE_HT,
+                   l.TVA_TX,
+                   l.PRIX_UNITAIRE_TTC,
+                   l.TOTAL_HT,
+                   l.TOTAL_TVA,
+                   l.TOTAL_TTC
+            FROM MLENTREE l
+            LEFT JOIN MARTICLE a
+                ON a.ID = l.ARTICLE_ID
+               AND a.DELETION_AT IS NULL
+            WHERE l.BON_ENTREE_ID = @bonEntreeId
+              AND l.DELETION_AT IS NULL
+            ORDER BY a.CODE";
 
         using (var cmd = new SqlCommand(sql, conn))
         {
@@ -162,16 +217,16 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
                 while (reader.Read())
                 {
                     var ligne = new Dictionary<string, object>();
-                    ligne["ARTICLE_ID"] = reader["ARTICLE_ID"] != DBNull.Value ? reader["ARTICLE_ID"].ToString() : null;
-                    ligne["ARTICLE_CODE"] = reader["ARTICLE_CODE"] != DBNull.Value ? reader["ARTICLE_CODE"].ToString() : "";
-                    ligne["ARTICLE_NOM"] = reader["ARTICLE_NOM"] != DBNull.Value ? reader["ARTICLE_NOM"].ToString() : "";
-                    ligne["QUANTITE"] = reader["QUANTITE"];
-                    ligne["PRIX_UNITAIRE_HT"] = reader["PRIX_UNITAIRE_HT"];
-                    ligne["TVA_TX"] = reader["TVA_TX"];
+                    ligne["ARTICLE_ID"]        = reader["ARTICLE_ID"] != DBNull.Value ? reader["ARTICLE_ID"].ToString() : null;
+                    ligne["ARTICLE_CODE"]      = reader["ARTICLE_CODE"] != DBNull.Value ? reader["ARTICLE_CODE"].ToString() : "";
+                    ligne["ARTICLE_NOM"]       = reader["ARTICLE_NOM"]  != DBNull.Value ? reader["ARTICLE_NOM"].ToString()  : "";
+                    ligne["QUANTITE"]          = reader["QUANTITE"];
+                    ligne["PRIX_UNITAIRE_HT"]  = reader["PRIX_UNITAIRE_HT"];
+                    ligne["TVA_TX"]            = reader["TVA_TX"];
                     ligne["PRIX_UNITAIRE_TTC"] = reader["PRIX_UNITAIRE_TTC"];
-                    ligne["TOTAL_HT"] = reader["TOTAL_HT"];
-                    ligne["TOTAL_TVA"] = reader["TOTAL_TVA"];
-                    ligne["TOTAL_TTC"] = reader["TOTAL_TTC"];
+                    ligne["TOTAL_HT"]          = reader["TOTAL_HT"];
+                    ligne["TOTAL_TVA"]         = reader["TOTAL_TVA"];
+                    ligne["TOTAL_TTC"]         = reader["TOTAL_TTC"];
                     lignes.Add(ligne);
                 }
             }
@@ -180,8 +235,5 @@ public class GetEntrees : IHttpHandler, IRequiresSessionState
         return lignes;
     }
 
-    public bool IsReusable
-    {
-        get { return false; }
-    }
+    public bool IsReusable { get { return false; } }
 }

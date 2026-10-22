@@ -33,7 +33,7 @@ public class GetFournisseurs : IHttpHandler, IRequiresSessionState
 
             using (var conn = new SqlConnection(connStr))
             using (var cmd = new SqlCommand(
-                "SELECT ID, NOM FROM SFOURNISSEUR WHERE ACTIVE = 1 AND DELETION_AT IS NULL ORDER BY NOM", conn))
+                "SELECT ID, NOM FROM FTIERS WHERE ACTIVE = 1 AND DELETION_AT IS NULL ORDER BY NOM", conn))
             {
                 conn.Open();
                 using (var reader = cmd.ExecuteReader())

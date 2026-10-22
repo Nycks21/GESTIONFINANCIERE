@@ -29,26 +29,62 @@ public class GetFournisseurs : IHttpHandler, IRequiresSessionState
             using (var conn = new SqlConnection(connStr))
             {
                 conn.Open();
-                string sql = "SELECT ID, NOM, CODE FROM SFOURNISSEUR WHERE ACTIVE = 1 AND DELETION_AT IS NULL ORDER BY NOM";
+
+                // ⭐ NOUVEAU : les fournisseurs viennent de FTIERS, rattachés au plan
+                //    comptable via PLAN_ELEMENT_ID. On les identifie par :
+                //      • TYPE_TIERS = 'FOURNISSEUR'   (fournisseur explicite)
+                //      • OU code du compte collectif PLAN1 commençant par '4' (legacy)
+                string sql = @"
+                    SELECT
+                        f.ID,
+                        f.CODE,
+                        f.NOM,
+                        f.TYPE_TIERS,
+                        f.PLAN_ELEMENT_ID,
+                        f.PLAN_ORDER,
+                        p.CODE AS PLAN_CODE
+                    FROM FTIERS f
+                    LEFT JOIN PLAN1 p
+                        ON p.ID = f.PLAN_ELEMENT_ID
+                       AND p.DELETION_AT IS NULL
+                    WHERE f.ACTIVE = 1
+                      AND f.DELETION_AT IS NULL
+                      AND (
+                            f.TYPE_TIERS = 'FOURNISSEUR'
+                         OR p.CODE LIKE '4%'
+                      )
+                    ORDER BY f.NOM";
+
                 using (var cmd = new SqlCommand(sql, conn))
                 using (var reader = cmd.ExecuteReader())
                 {
                     while (reader.Read())
                     {
                         var obj = new Dictionary<string, object>();
-                        obj["ID"] = reader["ID"].ToString();
-                        obj["NOM"] = reader["NOM"].ToString();
-                        obj["CODE"] = reader["CODE"].ToString();
+                        obj["ID"]             = reader["ID"].ToString();
+                        obj["NOM"]            = reader["NOM"].ToString();
+                        obj["CODE"]           = reader["CODE"].ToString();
+                        obj["TYPE_TIERS"]     = reader["TYPE_TIERS"] != DBNull.Value
+                                                ? reader["TYPE_TIERS"].ToString() : null;
+                        obj["PLAN_ELEMENT_ID"]= reader["PLAN_ELEMENT_ID"] != DBNull.Value
+                                                ? reader["PLAN_ELEMENT_ID"].ToString() : null;
+                        obj["PLAN_ORDER"]     = reader["PLAN_ORDER"] != DBNull.Value
+                                                ? reader["PLAN_ORDER"].ToString() : null;
+                        obj["PLAN_CODE"]      = reader["PLAN_CODE"] != DBNull.Value
+                                                ? reader["PLAN_CODE"].ToString() : null;
                         list.Add(obj);
                     }
                 }
             }
-            ctx.Response.Write(new JavaScriptSerializer().Serialize(new { success = true, Fournisseurs = list }));
+
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(
+                new { success = true, Fournisseurs = list }));
         }
         catch (Exception ex)
         {
             ctx.Response.StatusCode = 500;
-            ctx.Response.Write(new JavaScriptSerializer().Serialize(new { success = false, message = ex.Message.Replace("\"", "\\\"") }));
+            ctx.Response.Write(new JavaScriptSerializer().Serialize(
+                new { success = false, message = ex.Message.Replace("\"", "\\\"") }));
         }
     }
 

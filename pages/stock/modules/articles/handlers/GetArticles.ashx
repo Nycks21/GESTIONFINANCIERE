@@ -79,7 +79,7 @@ public class GetArticles : IHttpHandler, IRequiresSessionState
                            END AS STATUT_STOCK
                     FROM MARTICLE a
                     LEFT JOIN SCATEGORIE c ON a.CATEGORIE_ID = c.ID
-                    LEFT JOIN SFOURNISSEUR f ON a.FOURNISSEUR_PREFERE_ID = f.ID
+                    LEFT JOIN FTIERS f ON a.FOURNISSEUR_PREFERE_ID = f.ID
                     LEFT JOIN SUNITE u ON a.UNITE_MESURE_ID = u.ID
                     LEFT JOIN SEMPLACEMENT e ON a.EMPLACEMENT_ID = e.ID
                     " + whereClause + @"

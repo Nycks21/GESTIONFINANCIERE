@@ -169,7 +169,7 @@
                         </thead>
                         <tbody id="saisieTableBody">
                           <tr>
-                            <td colspan="7" style="text-align:center;padding:40px;">
+                            <td colspan="9" style="text-align:center;padding:40px;">
                               <i class="fas fa-spinner fa-spin" style="font-size:24px;color:#ccc;"></i>
                             </td>
                           </tr>

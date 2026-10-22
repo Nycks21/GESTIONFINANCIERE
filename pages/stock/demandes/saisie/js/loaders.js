@@ -6,6 +6,7 @@
 //   ✅ Format quantité "Dem → Reçu" (formatQuantitePair)
 //   ✅ Colonne DATE_RECEPTION
 //   ✅ colspan dynamique
+//   ✅ Chemin articles corrigé : pages/stock/modules/articles/handlers/
 // ============================================================
 
 if (typeof window.AppState === 'undefined') {
@@ -79,6 +80,8 @@ async function loadDemandesStats() {
             if (elV) elV.textContent = data.valide    ?? 0;
             if (elB) elB.textContent = data.brouillon ?? 0;
             if (elA) elA.textContent = data.annule    ?? 0;
+        } else {
+            console.error('[saisie] GetDemandesStats erreur :', data.message);
         }
     } catch (e) {
         console.warn('Erreur stats:', e);
@@ -87,16 +90,31 @@ async function loadDemandesStats() {
 
 // ============================================================
 // ARTICLES (pour les dropdowns du modal)
+// ⭐ CORRECTION : le module Articles est sous /pages/stock/modules/
+//    (l'ancien chemin /pages/modules/articles/handlers/ renvoyait 500)
 // ============================================================
 async function loadArticlesForSaisie() {
     try {
-        var url  = API.BASE + 'pages/modules/articles/handlers/' + API.ARTICLES + '?page=1&pageSize=999999';
+        var url = API.BASE + 'pages/stock/modules/articles/handlers/GetArticles.ashx?page=1&pageSize=999999';
+        console.log('[saisie] Chargement articles →', url);
+
         var resp = await fetch(url);
+        if (!resp.ok) {
+            console.error('[saisie] GetArticles HTTP ' + resp.status + ' → ' + url);
+            return;
+        }
+
         var data = await resp.json();
         if (data.success) {
             AppState.articles = data.Articles || [];
+            console.log('[saisie] ' + AppState.articles.length + ' article(s) chargé(s)');
+        } else {
+            console.error('[saisie] GetArticles a renvoyé une erreur :',
+                          data.sqlError || '', data.message || '');
         }
-    } catch (e) { /* ignore */ }
+    } catch (e) {
+        console.error('[saisie] Échec du chargement des articles :', e);
+    }
 }
 
 // ============================================================

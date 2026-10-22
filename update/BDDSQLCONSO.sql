@@ -6,9 +6,9 @@
 -- Architecture V3 :
 --   • SFOURNISSEUR SUPPRIMÉE — "fournisseur" = compte collectif PLAN1 (CODE 4xx)
 --   • FTIERS = tiers (auxiliaires) rattachés via PLAN_ELEMENT_ID
---   • MARTICLE.FOURNISSEUR_PREFERE_ID → PLAN1(ID)
---   • SENTREE.FOURNISSEUR_ID          → PLAN1(ID)
---   • FMARCHE.FOURNISSEUR_ID          → PLAN1(ID)
+--   • MARTICLE.FOURNISSEUR_PREFERE_ID → FTIERS(ID)
+--   • SENTREE.FOURNISSEUR_ID          → FTIERS(ID)
+--   • FMARCHE.FOURNISSEUR_ID          → FTIERS(ID)
 --   • 10 tables PLAN1..PLAN10 (une par plan comptable)
 --   • FPLAN_HEADER = configuration des 10 slots
 --   • FECRITURE_LIGNE.PLAN1..PLAN10 = imputation analytique
@@ -663,18 +663,10 @@ END;
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 5. AJOUTER LES FK VERS PLAN1 (maintenant que PLAN1 existe)
+-- 5. (section déplacée) — FK FOURNISSEUR ajoutées après
+--    création de FTIERS en section 6bis ci-dessous
 -- ═══════════════════════════════════════════════════════════
-
-ALTER TABLE dbo.MARTICLE
-    ADD CONSTRAINT FK_MARTICLE_PLAN1_FOURNISSEUR_PREF
-    FOREIGN KEY (FOURNISSEUR_PREFERE_ID) REFERENCES dbo.PLAN1(ID);
-PRINT 'OK - FK_MARTICLE_PLAN1_FOURNISSEUR_PREF';
-
-ALTER TABLE dbo.SENTREE
-    ADD CONSTRAINT FK_SENTREE_PLAN1_FOURNISSEUR
-    FOREIGN KEY (FOURNISSEUR_ID) REFERENCES dbo.PLAN1(ID);
-PRINT 'OK - FK_SENTREE_PLAN1_FOURNISSEUR';
+PRINT 'OK - Section 5 : FK FOURNISSEUR ajoutées après FTIERS';
 GO
 
 -- ═══════════════════════════════════════════════════════════
@@ -711,6 +703,21 @@ CREATE INDEX IX_FTIERS_PLAN_ELEMENT ON FTIERS(PLAN_ELEMENT_ID, ACTIVE)
     WHERE PLAN_ELEMENT_ID IS NOT NULL AND DELETION_AT IS NULL;
 CREATE INDEX IX_FTIERS_PLAN_ORDER ON FTIERS(PLAN_ORDER, ACTIVE);
 PRINT 'OK - FTIERS';
+GO
+
+-- ═══════════════════════════════════════════════════════════
+-- 6bis. FK FOURNISSEUR → FTIERS (maintenant que FTIERS existe)
+-- ═══════════════════════════════════════════════════════════
+
+ALTER TABLE dbo.MARTICLE
+    ADD CONSTRAINT FK_MARTICLE_FTIERS_FOURNISSEUR
+    FOREIGN KEY (FOURNISSEUR_PREFERE_ID) REFERENCES dbo.FTIERS(ID);
+PRINT 'OK - FK_MARTICLE_FTIERS_FOURNISSEUR';
+
+ALTER TABLE dbo.SENTREE
+    ADD CONSTRAINT FK_SENTREE_FTIERS_FOURNISSEUR
+    FOREIGN KEY (FOURNISSEUR_ID) REFERENCES dbo.FTIERS(ID);
+PRINT 'OK - FK_SENTREE_FTIERS_FOURNISSEUR';
 GO
 
 -- ═══════════════════════════════════════════════════════════
@@ -1153,7 +1160,7 @@ CREATE TABLE FMARCHE
         AND (DATE_ATTRIBUTION IS NULL OR DATE_LANCEMENT IS NULL OR DATE_ATTRIBUTION >= DATE_LANCEMENT)
     ),
     CONSTRAINT FK_FMARCHE_SITE                FOREIGN KEY (SITE_ID)        REFERENCES FSITE(ID),
-    CONSTRAINT FK_FMARCHE_PLAN1_FOURNISSEUR   FOREIGN KEY (FOURNISSEUR_ID) REFERENCES PLAN1(ID),
+    CONSTRAINT FK_FMARCHE_FTIERS_FOURNISSEUR  FOREIGN KEY (FOURNISSEUR_ID) REFERENCES FTIERS(ID),
     CONSTRAINT FK_FMARCHE_CREATED_BY          FOREIGN KEY (CREATED_BY)     REFERENCES USERS(IDUSER),
     CONSTRAINT FK_FMARCHE_UPDATED_BY          FOREIGN KEY (UPDATED_BY)     REFERENCES USERS(IDUSER),
     CONSTRAINT FK_FMARCHE_DELETION_BY         FOREIGN KEY (DELETION_BY)    REFERENCES USERS(IDUSER)
@@ -1416,15 +1423,35 @@ WHERE fk.referenced_object_id = OBJECT_ID('dbo.SFOURNISSEUR');
 
 PRINT '';
 PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — FK de MARTICLE et SENTREE vers PLAN1';
+PRINT 'VÉRIFICATION — FK FOURNISSEUR vers FTIERS';
 PRINT '══════════════════════════════════════════';
 SELECT
     fk.name AS FK_Name,
     OBJECT_NAME(fk.parent_object_id) AS Source_Table,
     OBJECT_NAME(fk.referenced_object_id) AS Target_Table
 FROM sys.foreign_keys fk
-WHERE fk.referenced_object_id = OBJECT_ID('dbo.PLAN1')
+WHERE fk.name LIKE '%FOURNISSEUR%'
+  AND fk.name LIKE '%TIERS%'
 ORDER BY fk.name;
+
+PRINT '';
+PRINT '⚠️  ATTENDU : 3 lignes, toutes vers FTIERS';
+PRINT '     • FK_MARTICLE_FTIERS_FOURNISSEUR → FTIERS';
+PRINT '     • FK_SENTREE_FTIERS_FOURNISSEUR  → FTIERS';
+PRINT '     • FK_FMARCHE_FTIERS_FOURNISSEUR  → FTIERS';
+PRINT '';
+
+PRINT '══════════════════════════════════════════';
+PRINT 'VÉRIFICATION — Aucune FK FOURNISSEUR ne pointe encore sur PLAN1';
+PRINT '══════════════════════════════════════════';
+SELECT
+    fk.name AS FK_Name,
+    OBJECT_NAME(fk.parent_object_id) AS Source_Table,
+    OBJECT_NAME(fk.referenced_object_id) AS Target_Table
+FROM sys.foreign_keys fk
+WHERE fk.name LIKE '%FOURNISSEUR%'
+  AND fk.referenced_object_id = OBJECT_ID('dbo.PLAN1');
+-- ⚠️ 0 ligne attendue
 
 PRINT '';
 PRINT '══════════════════════════════════════════';
