@@ -1,0 +1,179 @@
+/* ═══════════════════════════════════════════════════
+   LETTRAGE — Styles spécifiques
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Info Compte dans la Toolbar ─── */
+.toolbar-account-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-left: 20px;
+    padding-left: 20px;
+    border-left: 1px solid var(--s-border);
+}
+
+.account-name {
+    font-weight: 600;
+    color: var(--s-text);
+}
+
+/* ─── Ligne sélectionnée dans le tableau ─── */
+.grid-table tbody tr.row-selected {
+    background-color: rgba(37, 99, 235, 0.08) !important;
+    box-shadow: inset 3px 0 0 var(--s-primary);
+}
+
+/* ─── Barre d'action flottante (Sticky Bottom) ─── */
+.lettrage-action-bar {
+    position: fixed;
+    bottom: 30px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--s-card);
+    border: 1px solid var(--s-border);
+    border-radius: 12px;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.2), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 12px 24px;
+    z-index: 1000;
+    min-width: 600px;
+    animation: slideUpFloat 0.3s ease-out;
+}
+
+.lettrage-info {
+    display: flex;
+    gap: 30px;
+}
+
+.lettrage-stat {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.stat-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: var(--s-muted);
+    font-weight: 700;
+    letter-spacing: 0.5px;
+}
+
+.stat-value {
+    font-size: 18px;
+    font-weight: 800;
+    font-family: 'Courier New', monospace;
+    font-variant-numeric: tabular-nums;
+}
+
+.stat-value.debit { color: var(--s-debit); }
+.stat-value.credit { color: var(--s-credit); }
+.stat-value.text-danger { color: #DC2626; }
+
+.lettrage-actions {
+    display: flex;
+    gap: 12px;
+    margin-left: 30px;
+}
+
+/* Animation d'apparition spécifique à la barre flottante */
+@keyframes slideUpFloat {
+    from { opacity: 0; transform: translate(-50%, 20px); }
+    to   { opacity: 1; transform: translate(-50%, 0); }
+}
+
+/* ─── Dark Mode ─── */
+body.dark-mode .toolbar-account-info {
+    border-left-color: var(--s-border);
+}
+body.dark-mode .lettrage-action-bar {
+    background: var(--s-card);
+    border-color: var(--s-border);
+}
+
+/* ═══════════════════════════════════════════════════════════
+   MODALE FILTRE — Grille et groupes de champs
+   ═══════════════════════════════════════════════════════════ */
+
+.filter-grid {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 20px;
+}
+
+.filter-grid .form-group {
+    margin-bottom: 0;
+}
+
+.filter-grid .form-group-wide {
+    grid-column: 1 / -1;
+}
+
+.filter-grid label {
+    font-size: 12px;
+    font-weight: 700;
+    color: var(--s-muted);
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+    margin-bottom: 6px;
+    display: block;
+}
+
+.filter-grid .form-control {
+    height: 42px;
+    border-radius: 8px;
+    border: 1px solid var(--s-border);
+    font-size: 14px;
+    width: 100%;
+    padding: 0 12px;
+}
+
+.filter-grid .form-control:focus {
+    border-color: var(--s-primary);
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+    outline: none;
+}
+
+.filter-grid .form-control:disabled {
+    background: #F8FAFC;
+    color: #94A3B8;
+    cursor: not-allowed;
+}
+
+/* Groupe "Du ... au ..." */
+.range-group {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.range-group .form-control {
+    flex: 1;
+}
+
+.range-label {
+    font-size: 13px;
+    font-weight: 600;
+    color: var(--s-muted);
+    white-space: nowrap;
+}
+
+/* Dark Mode */
+body.dark-mode .filter-grid .form-control {
+    background: #0F172A;
+    color: #F1F5F9;
+    border-color: var(--s-border);
+}
+
+body.dark-mode .filter-grid .form-control:disabled {
+    background: #1E293B;
+    color: #64748B;
+}
+
+@media (max-width: 600px) {
+    .filter-grid {
+        grid-template-columns: 1fr;
+    }
+}

@@ -87,6 +87,18 @@
 
         string path  = (ctx.Request.Path ?? "");
         string lower = path.ToLower();
+        string requestPage = lower.Substring(lower.LastIndexOf('/') + 1);
+
+        if (DatabaseConnectionHelper.IsConnectionFailure(ex) &&
+            requestPage != "configurationbdd.aspx" &&
+            requestPage != "configurationbdd")
+        {
+            Server.ClearError();
+            ctx.Response.Clear();
+            ctx.Response.Redirect(VirtualPathUtility.ToAbsolute("~/ConfigurationBDD.aspx"), false);
+            ctx.ApplicationInstance.CompleteRequest();
+            return;
+        }
 
         // --- 1) Toujours logguer l'erreur réelle AVANT toute transformation ---
         try

@@ -28,6 +28,12 @@ function switchTab(tabName) {
         }
     }
 
+    if (tabName === 'list') {
+        window.location.href = API.BASE + 'pages/finance/saisie/liste-ecritures.aspx';
+        return;
+    }
+    if (tabName !== 'edit') return;
+
     document.querySelectorAll('.saisie-tab').forEach(function (t) {
         t.classList.toggle('active', t.getAttribute('data-tab') === tabName);
     });
@@ -45,8 +51,6 @@ function switchTab(tabName) {
 // ─── TOOLBAR ACTIONS (placeholders) ───
 function focusSearch() {
     switchTab('list');
-    var s = _el('search-filter');
-    if (s) s.focus();
 }
 
 function printEcriture() {

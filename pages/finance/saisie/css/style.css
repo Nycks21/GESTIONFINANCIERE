@@ -1133,3 +1133,48 @@ body.saisie-compact .header-exercice {
 
 body.saisie-compact .header-exercice label { font-size: 9px; }
 body.saisie-compact .header-exercice select { font-size: 10.5px; height: 16px; min-height: 16px !important; }
+
+/* ⭐ Grille — ligne soumise à restriction trésorerie */
+.ecr-ligne.row-restricted {
+    background-color: #fffbea;
+}
+
+/* ⭐ Cellule plan 2..10 grisée dans la grille */
+.plan-cell-restricted {
+    background-color: #f8f9fa;
+    color: #adb5bd;
+    opacity: 0.75;
+}
+.plan-cell-restricted .cell-badge {
+    opacity: 0.6;
+    text-decoration: line-through;
+}
+
+/* ⭐ Selects de plan 2..10 désactivés (formulaire) */
+select.plan-select-restricted,
+select.plan-select-restricted:disabled {
+    background-color: #e9ecef !important;
+    color: #6c757d !important;
+    cursor: not-allowed !important;
+    opacity: 0.85;
+}
+
+/* ═══════════════ CHAMP JOURNAL + BADGE CATÉGORIE ═══════════════ */
+/* Conteneur flex : select + badge sur la même ligne */
+.eh-field-journal-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+}
+
+.eh-field-journal-row select {
+    flex: 1 1 50%;   /* le select prend la moitié de la largeur */
+    min-width: 0;    /* évite le débordement flexbox */
+}
+
+.eh-field-journal-row #ecrCategorieBadge {
+    flex: 0 0 auto;  /* le badge prend la taille exacte de son contenu */
+    white-space: nowrap;
+    margin-left: 0 !important; /* neutralise l'ancien margin-left injecté par JS */
+}

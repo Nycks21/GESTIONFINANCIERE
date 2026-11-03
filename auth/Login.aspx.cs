@@ -49,14 +49,7 @@ public partial class Login : Page
         {
             HideMessages();
 
-            if (!TestDatabaseConnection())
-            {
-                ShowError("Connexion à la base de données impossible. Veuillez contacter l'administrateur.");
-                return;
-            }
-
             var licenceInfo = AuthHelper.GetLicenceInfo();
-
             if (!licenceInfo.IsValid)
             {
                 lblLicenceInfo.Text = licenceInfo.IsExpired
@@ -65,6 +58,13 @@ public partial class Login : Page
                 lblLicenceInfo.ForeColor = Color.Red;
                 lblLicenceInfo.Font.Bold = true;
                 lblLicenceInfo.Visible = true;
+                return;
+            }
+
+            if (!TestDatabaseConnection())
+            {
+                Response.Redirect(VirtualPathUtility.ToAbsolute("~/ConfigurationBDD.aspx"), false);
+                Context.ApplicationInstance.CompleteRequest();
                 return;
             }
 
@@ -115,35 +115,7 @@ public partial class Login : Page
 
     private bool TestDatabaseConnection()
     {
-        try
-        {
-            if (string.IsNullOrEmpty(connStr))
-            {
-                System.Diagnostics.Debug.WriteLine("❌ Chaîne de connexion vide");
-                return false;
-            }
-
-            using (SqlConnection conn = new SqlConnection(connStr))
-            {
-                conn.Open();
-                conn.Close();
-                return true;
-            }
-        }
-        catch (SqlException sqlEx)
-        {
-            System.Diagnostics.Debug.WriteLine("❌ Erreur SQL: " + sqlEx.Message);
-            if (sqlEx.Number == 53) ShowError("❌ Serveur SQL introuvable.");
-            else if (sqlEx.Number == 18456) ShowError("❌ Identifiants invalides.");
-            else if (sqlEx.Number == 4060) ShowError("❌ Base de données inaccessible.");
-            else ShowError("❌ Erreur de connexion: " + sqlEx.Message);
-            return false;
-        }
-        catch (Exception ex)
-        {
-            ShowError("❌ Erreur de connexion: " + ex.Message);
-            return false;
-        }
+        return DatabaseConnectionHelper.CheckCurrentConnection().IsConnected;
     }
 
     // ============================================================

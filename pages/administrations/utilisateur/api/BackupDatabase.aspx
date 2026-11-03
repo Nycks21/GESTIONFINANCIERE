@@ -259,10 +259,10 @@ private string GetCurrentDatabaseName()
     // ─── 1) Lire depuis la chaîne de connexion "MaConnexion" ───
     try
     {
-        var cs = ConfigurationManager.ConnectionStrings["MaConnexion"];
-        if (cs != null && !string.IsNullOrEmpty(cs.ConnectionString))
+        string cs = AuthHelper.ConnectionString;
+        if (!string.IsNullOrEmpty(cs))
         {
-            var builder = new SqlConnectionStringBuilder(cs.ConnectionString);
+            var builder = new SqlConnectionStringBuilder(cs);
             if (!string.IsNullOrEmpty(builder.InitialCatalog))
                 return builder.InitialCatalog;
         }

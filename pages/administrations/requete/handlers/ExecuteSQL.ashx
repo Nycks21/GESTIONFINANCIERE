@@ -50,7 +50,7 @@ public class ExecuteSQL : IHttpHandler, IRequiresSessionState
             return;
         }
 
-        string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+        string connStr = AuthHelper.ConnectionString;
 
         using (SqlConnection conn = new SqlConnection(connStr))
         {

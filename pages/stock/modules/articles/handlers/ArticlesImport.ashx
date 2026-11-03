@@ -128,11 +128,6 @@ public class ArticlesImport : IHttpHandler, IRequiresSessionState
             string connStr = AuthHelper.ConnectionString;
             if (string.IsNullOrEmpty(connStr))
             {
-                var cs = ConfigurationManager.ConnectionStrings["MaConnexion"];
-                if (cs != null) connStr = cs.ConnectionString;
-            }
-            if (string.IsNullOrEmpty(connStr))
-            {
                 WriteJson(context, ErrorResponse(
                     "articles.server.no_connection",
                     "Chaîne de connexion introuvable."));

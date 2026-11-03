@@ -1,6 +1,62 @@
 // loaders.js — SAISIE (orchestrateur + options auxiliaire + expansion lignes + Vue bridge)
+// ⭐ Mise à jour : chargement des comptes par plan dans loadLookups()
+// ⭐ Mise à jour : hook afterLookupsLoaded() → applique la restriction PLAN1
+// ⭐ NOUVEAU : pré-sélection du site par défaut (EN_COURS prioritaire)
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
+
+// ============================================================
+// ⭐ HELPER — DÉTERMINATION DU SITE PAR DÉFAUT
+//    Priorité 1 : site EN_COURS = true
+//    Priorité 2 : site CODE = '01'
+//    Priorité 3 : premier site de la liste
+//    Retourne '' si aucun site actif.
+// ============================================================
+function getDefaultSiteId() {
+    var sites = (AppState && AppState.sites) ? AppState.sites : [];
+    if (!sites.length) return '';
+
+    // Priorité 1 : site marqué "en cours"
+    for (var i = 0; i < sites.length; i++) {
+        if (sites[i].EN_COURS === true || sites[i].EN_COURS === 1) {
+            return sites[i].ID;
+        }
+    }
+    // Priorité 2 : site avec CODE = '01'
+    for (var j = 0; j < sites.length; j++) {
+        if (String(sites[j].CODE) === '01') {
+            return sites[j].ID;
+        }
+    }
+    // Priorité 3 : premier site de la liste
+    return sites[0].ID;
+}
+
+// ============================================================
+// ⭐ HELPER — APPLIQUE LE SITE PAR DÉFAUT AU <select id="ecrSite">
+//    Peut être appelé plusieurs fois (idempotent).
+// ============================================================
+function applyDefaultSiteToSelect() {
+    var s = document.getElementById('ecrSite');
+    if (!s) return;
+
+    var defaultSiteId = getDefaultSiteId();
+    if (!defaultSiteId) {
+        s.value = '';
+        return;
+    }
+    s.value = defaultSiteId;
+
+    // Log pour debug
+    var found = null;
+    var sites = AppState.sites || [];
+    for (var i = 0; i < sites.length; i++) {
+        if (sites[i].ID === defaultSiteId) { found = sites[i]; break; }
+    }
+    console.log('[applyDefaultSiteToSelect] Site par défaut →',
+        defaultSiteId,
+        found ? ('(' + found.CODE + ' — ' + found.NOM + ')') : '');
+}
 
 // ============================================================
 // CHARGEMENT DES LOOKUPS
@@ -9,11 +65,11 @@ async function loadLookups() {
     try {
         var url = API.BASE + API.HANDLERS_PATH + API.LOOKUPS;
         var resp = await fetch(url);
+        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' lors du chargement des référentiels.');
         var data = await resp.json();
 
         if (!data.success) {
-            console.warn('[loadLookups] Réponse non OK :', data.message);
-            return;
+            throw new Error(data.message || 'Impossible de charger les référentiels.');
         }
 
         AppState.sites              = data.sites              || [];
@@ -28,7 +84,7 @@ async function loadLookups() {
         AppState.ecritureLinesCache = AppState.ecritureLinesCache || {};
         AppState.expandedEcritures  = AppState.expandedEcritures  || {};
 
-        // ⭐ NOUVEAU : chargement parallèle des marchés
+        // Chargement parallèle des marchés
         await loadMarchesLookup();
 
         populateHeaderSelects();
@@ -36,17 +92,35 @@ async function loadLookups() {
         renderFormPlanFields();
         renderGridHead();
 
+        // ⭐ NOUVEAU : charge les comptes de chaque plan et peuple les <select>
+        //    (indispensable pour que la restriction PLAN1 puisse être évaluée
+        //    dès l'ouverture d'une écriture, et pour voir les options)
+        await loadAllComptesActifs();
+
+        // ⭐ NOUVEAU : applique la catégorie journal + restriction PLAN1
+        //    (fonction définie dans grid.js)
+        if (typeof afterLookupsLoaded === 'function') {
+            afterLookupsLoaded();
+        }
+
+        // ⭐ NOUVEAU : garantit le binding du select journal même si grid.js
+        //    a chargé avant que populateHeaderSelects() ne soit exécuté
+        if (typeof _bindJournalCategoryListener === 'function') {
+            try { _bindJournalCategoryListener(); } catch (e) { /* ignore */ }
+        }
+
         // ⭐ Sync des journaux dans Vue si présent
         if (window._VueSaisieList && typeof window._VueSaisieList.syncJournaux === 'function') {
             window._VueSaisieList.syncJournaux();
         }
     } catch (err) {
         console.error('[loadLookups] Erreur :', err);
+        throw err;
     }
 }
 
 // ============================================================
-// ⭐ NOUVEAU — CHARGEMENT DES MARCHÉS (select ecrMarche)
+// CHARGEMENT DES MARCHÉS (select ecrMarche)
 // ============================================================
 async function loadMarchesLookup() {
     AppState.marchesLookup = [];
@@ -62,7 +136,7 @@ async function loadMarchesLookup() {
         var ct   = (resp.headers.get('content-type') || '').toLowerCase();
         var text = await resp.text();
 
-        // ⭐ Détection robuste : HTML au lieu de JSON
+        // Détection robuste : HTML au lieu de JSON
         if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<') {
             console.warn('[loadMarchesLookup] Handler indisponible (HTTP ' + resp.status +
                          ') — select ecrMarche vide');
@@ -85,7 +159,7 @@ async function loadMarchesLookup() {
 // PEUPLEMENT DES SELECTS D'ENTÊTE
 // ============================================================
 function populateHeaderSelects() {
-    // Sites
+    // ─── Sites ───
     var s = document.getElementById('ecrSite');
     if (s) {
         s.innerHTML = '<option value="">—</option>';
@@ -93,11 +167,17 @@ function populateHeaderSelects() {
             var o = document.createElement('option');
             o.value = x.ID;
             o.textContent = x.CODE + ' — ' + x.NOM;
+            if (x.EN_COURS === true || x.EN_COURS === 1) {
+                o.setAttribute('data-en-cours', '1');
+            }
             s.appendChild(o);
         });
+
+        // ⭐ Pré-sélection du site par défaut (EN_COURS prioritaire)
+        applyDefaultSiteToSelect();
     }
 
-    // Journaux (edit panel)
+    // ─── Journaux (edit panel) ───
     var j = document.getElementById('ecrJournal');
     if (j) {
         j.innerHTML = '<option value="">—</option>';
@@ -105,12 +185,14 @@ function populateHeaderSelects() {
             var o = document.createElement('option');
             o.value = x.ID;
             o.textContent = x.CODE + ' — ' + x.LIBELLE;
+            // ⭐ attr utilisé par _resolveCategorieJournal() si AppState.journaux
+            //    n'expose pas CATEGORIE_JOURNAL (fallback DOM)
             o.setAttribute('data-categorie', x.CATEGORIE_JOURNAL);
             j.appendChild(o);
         });
     }
 
-    // Journal filter (LIST) — SKIP si Vue gère
+    // ─── Journal filter (LIST) — SKIP si Vue gère ───
     if (!window._VueSaisieList) {
         var jf = document.getElementById('journal-filter');
         if (jf) {
@@ -124,7 +206,7 @@ function populateHeaderSelects() {
         }
     }
 
-    // Exercices
+    // ─── Exercices ───
     var e = document.getElementById('ecrExercice');
     if (e) {
         e.innerHTML = '<option value="">—</option>';
@@ -136,11 +218,10 @@ function populateHeaderSelects() {
         });
         if (AppState.exercices.length === 1) {
             e.value = AppState.exercices[0].ID;
-            loadPeriodes(AppState.exercices[0].ID);
         }
     }
 
-    // Monnaies
+    // ─── Monnaies ───
     var m = document.getElementById('ecrDevise');
     if (m) {
         m.innerHTML = '<option value="">—</option>';
@@ -153,23 +234,19 @@ function populateHeaderSelects() {
         });
     }
 
-    // ⭐ NOUVEAU : Marchés (ecrMarche)
+    // ─── Marchés (ecrMarche) ───
     var mrc = document.getElementById('ecrMarche');
     if (mrc) {
         mrc.innerHTML = '<option value="">— Aucun marché —</option>';
         (AppState.marchesLookup || []).forEach(function (x) {
             var o = document.createElement('option');
-
-            // ⭐ value = ID du marché (GUID) — stocké dans FECRITURE.MARCHE
             o.value = x.ID;
 
-            // ⭐ text = NUMERO — DESCRIPTION (Fournisseur)
             var label = x.NUMERO;
             if (x.DESCRIPTION)     label += ' — ' + x.DESCRIPTION;
             if (x.FOURNISSEUR_NOM) label += ' (' + x.FOURNISSEUR_NOM + ')';
             o.textContent = label;
 
-            // Attributs utiles pour debug
             o.setAttribute('data-marche-id',     x.ID);
             o.setAttribute('data-marche-numero', x.NUMERO);
             o.setAttribute('data-statut',        x.STATUT);
@@ -181,7 +258,7 @@ function populateHeaderSelects() {
                     (AppState.marchesLookup || []).length, 'option(s)');
     }
 
-    // Modes
+    // ─── Modes ───
     var mo = document.getElementById('flMode');
     if (mo) {
         mo.innerHTML = '<option value="">—</option>';
@@ -193,7 +270,7 @@ function populateHeaderSelects() {
         });
     }
 
-    // Subvention
+    // ─── Subvention ───
     var sb = document.getElementById('flSub');
     if (sb) {
         sb.innerHTML = '<option value="">—</option>';
@@ -206,7 +283,9 @@ function populateHeaderSelects() {
     }
 }
 
-// ⭐ NOUVEAU : helper public pour rafraîchir le select après création/édition d'un marché
+// ============================================================
+// ⭐ HELPER PUBLIC — rafraîchir le select marché
+// ============================================================
 async function refreshMarchesLookup() {
     await loadMarchesLookup();
     var mrc = document.getElementById('ecrMarche');
@@ -228,10 +307,7 @@ async function refreshMarchesLookup() {
         mrc.appendChild(o);
     });
 
-    // Restaure la sélection précédente si elle existe encore
-    if (current) {
-        mrc.value = current;
-    }
+    if (current) mrc.value = current;
 }
 
 // ============================================================
@@ -286,10 +362,11 @@ function populateAuxiliaireOptions(filterByPlanElementId, preserveValue) {
 }
 
 // ============================================================
-// PÉRIODES (robuste)
+// PÉRIODES
 // ============================================================
 async function loadPeriodes(exerciceId) {
     AppState.periodes = [];
+    AppState.periodesExerciceId = '';
     if (!exerciceId) return;
 
     try {
@@ -300,18 +377,17 @@ async function loadPeriodes(exerciceId) {
         var ct   = (resp.headers.get('content-type') || '').toLowerCase();
         var text = await resp.text();
 
-        if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<') {
-            console.warn('[loadPeriodes] Handler indisponible (HTTP ' + resp.status + ')');
-            return;
-        }
+        if (!resp.ok || !ct.includes('application/json') || text.trim().charAt(0) === '<')
+            throw new Error('Impossible de charger les périodes (HTTP ' + resp.status + ').');
 
         var data = JSON.parse(text);
-        if (data.success) {
-            AppState.periodes = data.periodes || [];
-            console.log('[loadPeriodes] ' + AppState.periodes.length + ' période(s) chargée(s)');
-        }
+        if (!data.success) throw new Error(data.message || 'Impossible de charger les périodes.');
+        AppState.periodes = data.periodes || [];
+        AppState.periodesExerciceId = String(exerciceId);
+        console.log('[loadPeriodes] ' + AppState.periodes.length + ' période(s) chargée(s)');
     } catch (err) {
-        console.warn('[loadPeriodes] Ignoré :', err.message || err);
+        console.error('[loadPeriodes] Erreur :', err);
+        throw err;
     }
 }
 
@@ -322,15 +398,18 @@ function findPeriodeId(dateStr) {
     if (AppState.periodes && AppState.periodes.length) {
         for (var i = 0; i < AppState.periodes.length; i++) {
             var p = AppState.periodes[i];
+            if (String(p.STATUT || '').toUpperCase() !== 'OUVERTE') continue;
             var debut = (p.DATE_DEBUT || '').substring(0, 10);
             var fin   = (p.DATE_FIN   || '').substring(0, 10);
             if (d >= debut && d <= fin) return p.ID;
         }
     }
-
     var exerciceId = _getVal('ecrExercice');
-    if (exerciceId) return exerciceId;
-    return '';
+    return exerciceId
+        && AppState.periodesExerciceId === exerciceId
+        && AppState.periodes.length === 0
+        ? exerciceId
+        : '';
 }
 
 // ============================================================
@@ -338,18 +417,13 @@ function findPeriodeId(dateStr) {
 // ============================================================
 async function loadComptesByPlan(ordre) {
     if (AppState.comptesParPlan[ordre]) return AppState.comptesParPlan[ordre];
-    try {
-        var url = API.BASE + API.HANDLERS_PATH + API.COMPTES_BY_PLAN + '?planOrder=' + ordre;
-        var resp = await fetch(url);
-        var data = await resp.json();
-        if (data.success) {
-            AppState.comptesParPlan[ordre] = data.comptes || [];
-            return data.comptes || [];
-        }
-    } catch (err) {
-        console.error('[loadComptesByPlan ' + ordre + ']', err);
-    }
-    return [];
+    var url = API.BASE + API.HANDLERS_PATH + API.COMPTES_BY_PLAN + '?planOrder=' + ordre;
+    var resp = await fetch(url);
+    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' lors du chargement du plan ' + ordre + '.');
+    var data = await resp.json();
+    if (!data.success) throw new Error(data.message || 'Impossible de charger le plan ' + ordre + '.');
+    AppState.comptesParPlan[ordre] = data.comptes || [];
+    return AppState.comptesParPlan[ordre];
 }
 
 async function loadAllComptesActifs() {
@@ -688,8 +762,8 @@ function _refreshLinesCounter() {
 // EXPOSITIONS
 // ============================================================
 window.loadLookups               = loadLookups;
-window.loadMarchesLookup         = loadMarchesLookup;    // ⭐ NOUVEAU
-window.refreshMarchesLookup      = refreshMarchesLookup; // ⭐ NOUVEAU
+window.loadMarchesLookup         = loadMarchesLookup;
+window.refreshMarchesLookup      = refreshMarchesLookup;
 window.populateHeaderSelects     = populateHeaderSelects;
 window.populateAuxiliaireOptions = populateAuxiliaireOptions;
 window.loadPeriodes              = loadPeriodes;
@@ -702,3 +776,7 @@ window.toggleEcritureLines       = toggleEcritureLines;
 window.buildEcritureLinesRow     = buildEcritureLinesRow;
 window.resolvePlanCodeByOrdre    = resolvePlanCodeByOrdre;
 window._refreshLinesCounter      = _refreshLinesCounter;
+
+// ⭐ Helpers site par défaut
+window.getDefaultSiteId          = getDefaultSiteId;
+window.applyDefaultSiteToSelect  = applyDefaultSiteToSelect;

@@ -33,6 +33,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             string periodeId        = GetString(data, "periodeId");
             string journalId        = GetString(data, "journalId");
             string monnaieId        = GetString(data, "monnaieId");
+            decimal coursDevise     = GetDecimal(data, "coursDevise", 1m);
             string siteId           = GetString(data, "siteId");
             string numero           = (GetString(data, "numero") ?? "").Trim();
             string dateCmp          = GetString(data, "dateComptable");
@@ -42,7 +43,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             string dateFacture      = GetString(data, "dateFacture");
             string libelle          = (GetString(data, "libelle") ?? "").Trim();
             string statut           = (GetString(data, "statut") ?? "BROUILLON").Trim().ToUpperInvariant();
-            // ⭐ NOUVEAU : ID du marché (GUID) stocké dans FECRITURE.MARCHE
             string marche           = (GetString(data, "marche") ?? "").Trim();
 
             Guid tmp;
@@ -52,12 +52,13 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             { ctx.Response.Write("{\"success\":false,\"message\":\"Journal requis.\"}"); return; }
             if (string.IsNullOrEmpty(monnaieId) || !Guid.TryParse(monnaieId, out tmp))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Devise requise.\"}"); return; }
+            if (coursDevise <= 0)
+            { ctx.Response.Write("{\"success\":false,\"message\":\"Cours de devise invalide.\"}"); return; }
             if (string.IsNullOrEmpty(numero))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Numéro obligatoire.\"}"); return; }
             if (string.IsNullOrEmpty(libelle))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Libellé obligatoire.\"}"); return; }
 
-            // ⭐ Validation du marché : doit être un GUID valide si fourni
             if (!string.IsNullOrEmpty(marche) && !Guid.TryParse(marche, out tmp))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Identifiant marché invalide.\"}"); return; }
 
@@ -92,9 +93,23 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 decimal debit         = GetDecimal(l, "debit", 0);
                 decimal credit        = GetDecimal(l, "credit", 0);
                 decimal montantDevise = GetDecimal(l, "montantDevise", 0);
+                decimal coursLigne    = GetDecimal(l, "coursDevise", coursDevise);
+                string dateEcheanceRaw = GetString(l, "dateEcheance");
+                DateTime dateEcheance;
+                int categorieJournal  = GetInt(l, "categorieJournal", 1);
 
-                if (debit < 0 || credit < 0 || (debit > 0 && credit > 0) || (debit == 0 && credit == 0))
+                if (debit < 0 || credit < 0 || montantDevise < 0
+                    || (debit > 0 && credit > 0) || (debit == 0 && credit == 0))
                 { ctx.Response.Write("{\"success\":false,\"message\":\"Montant invalide sur une ligne.\"}"); return; }
+                if (categorieJournal != 1 && categorieJournal != 2)
+                { ctx.Response.Write("{\"success\":false,\"message\":\"Catégorie de journal invalide.\"}"); return; }
+                if (coursLigne <= 0)
+                { ctx.Response.Write("{\"success\":false,\"message\":\"Cours de devise invalide sur une ligne.\"}"); return; }
+                if (!string.IsNullOrEmpty(dateEcheanceRaw)
+                    && !DateTime.TryParseExact(dateEcheanceRaw, "yyyy-MM-dd",
+                        System.Globalization.CultureInfo.InvariantCulture,
+                        System.Globalization.DateTimeStyles.None, out dateEcheance))
+                { ctx.Response.Write("{\"success\":false,\"message\":\"Date d'échéance invalide.\"}"); return; }
 
                 string sens = debit > 0 ? "D" : "C";
                 decimal montant = debit > 0 ? debit : credit;
@@ -117,6 +132,11 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 pl["SENS"]               = sens;
                 pl["MONTANT"]            = montant;
                 pl["MONTANT_DEVISE"]     = montantDevise;
+                pl["COURS_DEVISE"]       = coursLigne;
+                pl["DATE_ECHEANCE"]      = string.IsNullOrEmpty(dateEcheanceRaw) ? null : (object)DateTime.ParseExact(
+                    dateEcheanceRaw, "yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+                pl["CATEGORIE_JOURNAL"]  = categorieJournal;
+                pl["MODE_REGULARISATION"] = GetString(l, "modeRegularisation");
                 pl["SOURCE_FINANCEMENT"] = GetString(l, "sourceFinancement");
 
                 for (int k = 1; k <= 10; k++)
@@ -186,7 +206,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                     throw new Exception("Écriture non modifiable (statut " + curStatut + ").");
                             }
 
-                            // ⭐ UPDATE avec MARCHE + REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 UPDATE FECRITURE
                                 SET EXERCICE_ID=@ex, PERIODE_ID=@pe, JOURNAL_ID=@j,
@@ -204,7 +223,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@j", journalId);
                                 cmd.Parameters.AddWithValue("@site", hasSite ? (object)siteGuid : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@m", monnaieId);
-                                // ⭐ NOUVEAU
                                 cmd.Parameters.AddWithValue("@marche", string.IsNullOrEmpty(marche) ? (object)DBNull.Value : marche);
                                 cmd.Parameters.AddWithValue("@n", numero);
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
@@ -229,7 +247,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                         }
                         else
                         {
-                            // ⭐ INSERT avec MARCHE + REFERENCE_FACTURE + DATE_FACTURE
                             using (var cmd = new SqlCommand(@"
                                 INSERT INTO FECRITURE
                                     (ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, SITE_ID, MONNAIE_ID,
@@ -250,7 +267,6 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@j", journalId);
                                 cmd.Parameters.AddWithValue("@site", hasSite ? (object)siteGuid : DBNull.Value);
                                 cmd.Parameters.AddWithValue("@m", monnaieId);
-                                // ⭐ NOUVEAU
                                 cmd.Parameters.AddWithValue("@marche", string.IsNullOrEmpty(marche) ? (object)DBNull.Value : marche);
                                 cmd.Parameters.AddWithValue("@n", numero);
                                 cmd.Parameters.AddWithValue("@dc", dtComptable);
@@ -267,19 +283,73 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                             }
                         }
 
-                        // ⭐ INSERTION DES LIGNES
+                        // ═══════════════════════════════════════════════════
+                        // ⭐ Récupérer les codes des comptes (LETTRABLE)
+                        // ═══════════════════════════════════════════════════
+                        var compteCodes = new Dictionary<Guid, string>();
+                        var uniqueIds = new HashSet<Guid>();
+                        foreach (var pl in parsedLignes)
+                            uniqueIds.Add((Guid)pl["COMPTE_ID"]);
+
+                        if (uniqueIds.Count > 0)
+                        {
+                            var idList = new List<Guid>(uniqueIds);
+                            var paramNames = new string[idList.Count];
+                            using (var cmd = new SqlCommand())
+                            {
+                                cmd.Connection = conn;
+                                cmd.Transaction = tx;
+
+                                for (int i = 0; i < idList.Count; i++)
+                                {
+                                    paramNames[i] = "@cc" + i;
+                                    cmd.Parameters.AddWithValue(paramNames[i], idList[i]);
+                                }
+
+                                cmd.CommandText = "SELECT ID, CODE FROM VW_ALL_PLAN_ELEMENTS WHERE ID IN ("
+                                                + string.Join(",", paramNames) + ")";
+
+                                using (var r = cmd.ExecuteReader())
+                                {
+                                    while (r.Read())
+                                    {
+                                        Guid g;
+                                        if (Guid.TryParse(r["ID"].ToString(), out g))
+                                        {
+                                            string c = r["CODE"] == DBNull.Value ? "" : r["CODE"].ToString();
+                                            compteCodes[g] = c;
+                                        }
+                                    }
+                                }
+                            }
+                        }
+
+                        // ═══════════════════════════════════════════════════
+                        // INSERTION DES LIGNES (avec LETTRABLE dynamique)
+                        // ═══════════════════════════════════════════════════
                         int ordre = 1;
                         foreach (var l in parsedLignes)
                         {
+                            Guid cid = (Guid)l["COMPTE_ID"];
+                            string codeCompte;
+                            bool lettrable =
+                                compteCodes.TryGetValue(cid, out codeCompte)
+                                && !string.IsNullOrEmpty(codeCompte)
+                                && codeCompte.StartsWith("4");
+
                             using (var cmd = new SqlCommand(@"
                                 INSERT INTO FECRITURE_LIGNE
                                     (ID, ECRITURE_ID, ORDRE, COMPTE_ID, COMPTE_PLAN_ORDER, TIERS_ID,
-                                     AUXILIAIRE, LIBELLE, SENS, MONTANT, MONTANT_DEVISE,
+                                     AUXILIAIRE, LIBELLE, SENS, MONTANT, MONTANT_DEVISE, COURS_DEVISE,
+                                     DATE_ECHEANCE, MODE_REGULARISATION,
+                                     CATEGORIE_JOURNAL, LETTRABLE,
                                      PLAN1, PLAN2, PLAN3, PLAN4, PLAN5, PLAN6, PLAN7, PLAN8, PLAN9, PLAN10,
                                      SOURCE_FINANCEMENT, CREATED_BY, CREATED_AT)
                                 VALUES
                                     (@id, @eid, @o, @cid, @cpo, @tid,
-                                     @aux, @lib, @sens, @mnt, @mntdev,
+                                     @aux, @lib, @sens, @mnt, @mntdev, @cours,
+                                     @echeance, @modeReg,
+                                     @catj, @lettrable,
                                      @p1, @p2, @p3, @p4, @p5, @p6, @p7, @p8, @p9, @p10,
                                      @src, @u, GETDATE())", conn, tx))
                             {
@@ -295,6 +365,11 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@mnt", l["MONTANT"]);
                                 decimal mntDev = (decimal)l["MONTANT_DEVISE"];
                                 cmd.Parameters.AddWithValue("@mntdev", mntDev != 0 ? (object)mntDev : DBNull.Value);
+                                cmd.Parameters.AddWithValue("@cours", l["COURS_DEVISE"]);
+                                cmd.Parameters.AddWithValue("@echeance", l["DATE_ECHEANCE"] ?? (object)DBNull.Value);
+                                cmd.Parameters.AddWithValue("@modeReg", string.IsNullOrEmpty((string)l["MODE_REGULARISATION"]) ? (object)DBNull.Value : l["MODE_REGULARISATION"]);
+                                cmd.Parameters.AddWithValue("@catj", l["CATEGORIE_JOURNAL"]);
+                                cmd.Parameters.AddWithValue("@lettrable", lettrable ? 1 : 0);
                                 cmd.Parameters.AddWithValue("@p1",  l["PLAN1"]  ?? (object)DBNull.Value);
                                 cmd.Parameters.AddWithValue("@p2",  l["PLAN2"]  ?? (object)DBNull.Value);
                                 cmd.Parameters.AddWithValue("@p3",  l["PLAN3"]  ?? (object)DBNull.Value);
@@ -310,7 +385,137 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                                 cmd.ExecuteNonQuery();
                             }
                         }
+                        // ⭐ FIN de la boucle des INSERT lignes
 
+                        // ═══════════════════════════════════════════════════════════
+                        // ⭐ LETTRAGE AUTOMATIQUE — exécuté UNE seule fois
+                        //    après l'insertion de toutes les lignes.
+                        //    Uniquement pour les créations (pas en édition).
+                        // ═══════════════════════════════════════════════════════════
+                        var lettrageSources = GetObjectList(data, "lettrageSources");
+                        if (lettrageSources.Count > 0 && !isEdit)
+                        {
+                            string lettrageId   = Guid.NewGuid().ToString();
+                            string lettrageCode = "L" + DateTime.Now.ToString("yyMMddHHmmss");
+
+                            decimal totalLettrage = 0;
+                            foreach (var src in lettrageSources)
+                                totalLettrage += GetDecimal(src, "montant", 0);
+
+                            // 1. Entête FLETTRAGE
+                            using (var cmdL = new SqlCommand(@"
+                                INSERT INTO FLETTRAGE (ID, CODE, DATE_LETTRAGE, MONTANT, ACTIVE, CREATED_BY, CREATED_AT)
+                                VALUES (@id, @code, CAST(GETDATE() AS DATE), @mnt, 1, @u, GETDATE())", conn, tx))
+                            {
+                                cmdL.Parameters.AddWithValue("@id", lettrageId);
+                                cmdL.Parameters.AddWithValue("@code", lettrageCode);
+                                cmdL.Parameters.AddWithValue("@mnt", totalLettrage);
+                                cmdL.Parameters.AddWithValue("@u", userId);
+                                cmdL.ExecuteNonQuery();
+                            }
+
+                            // 2. Map compte 4xxx → ligne trésorerie
+                            var tresorerieLignesMap = new Dictionary<Guid, string>();
+                            foreach (var pl in parsedLignes)
+                            {
+                                Guid cid = (Guid)pl["COMPTE_ID"];
+                                string codeC;
+                                if (compteCodes.TryGetValue(cid, out codeC)
+                                    && codeC.StartsWith("4")
+                                    && !tresorerieLignesMap.ContainsKey(cid))
+                                {
+                                    using (var cmdFind = new SqlCommand(@"
+                                        SELECT TOP 1 ID FROM FECRITURE_LIGNE
+                                        WHERE ECRITURE_ID = @eid AND COMPTE_ID = @cid
+                                        ORDER BY ORDRE DESC", conn, tx))
+                                    {
+                                        cmdFind.Parameters.AddWithValue("@eid", finalId);
+                                        cmdFind.Parameters.AddWithValue("@cid", cid);
+                                        object o = cmdFind.ExecuteScalar();
+                                        if (o != null && o != DBNull.Value)
+                                            tresorerieLignesMap[cid] = o.ToString();
+                                    }
+                                }
+                            }
+
+                            // 3. Liens FLETTRAGE_LIGNE (OD + trésorerie)
+                            //    HashSet pour dédupliquer les ECRITURE_LIGNE_ID
+                            var insertedLineIds = new HashSet<string>();
+
+                            foreach (var src in lettrageSources)
+                            {
+                                string srcLineId = GetString(src, "ecritureLigneId");
+                                decimal montant  = GetDecimal(src, "montant", 0);
+
+                                Guid srcGuid;
+                                if (string.IsNullOrEmpty(srcLineId) || !Guid.TryParse(srcLineId, out srcGuid))
+                                    continue;
+
+                                // Ligne 1 : ligne OD
+                                if (!insertedLineIds.Contains(srcLineId))
+                                {
+                                    using (var cmd1 = new SqlCommand(@"
+                                        INSERT INTO FLETTRAGE_LIGNE
+                                            (ID, LETTRAGE_ID, ECRITURE_LIGNE_ID, MONTANT_LETTRE, CREATED_BY, CREATED_AT)
+                                        VALUES
+                                            (@id, @lid, @elid, @mnt, @u, GETDATE())", conn, tx))
+                                    {
+                                        cmd1.Parameters.AddWithValue("@id", Guid.NewGuid().ToString());
+                                        cmd1.Parameters.AddWithValue("@lid", lettrageId);
+                                        cmd1.Parameters.AddWithValue("@elid", srcGuid);
+                                        cmd1.Parameters.AddWithValue("@mnt", montant);
+                                        cmd1.Parameters.AddWithValue("@u", userId);
+                                        cmd1.ExecuteNonQuery();
+                                    }
+                                    insertedLineIds.Add(srcLineId);
+                                }
+
+                                // Ligne 2 : ligne trésorerie (même compte)
+                                Guid compteGuid;
+                                if (Guid.TryParse(GetString(src, "compteId"), out compteGuid)
+                                    && tresorerieLignesMap.ContainsKey(compteGuid))
+                                {
+                                    string trLineId = tresorerieLignesMap[compteGuid];
+                                    if (!insertedLineIds.Contains(trLineId))
+                                    {
+                                        using (var cmd2 = new SqlCommand(@"
+                                            INSERT INTO FLETTRAGE_LIGNE
+                                                (ID, LETTRAGE_ID, ECRITURE_LIGNE_ID, MONTANT_LETTRE, CREATED_BY, CREATED_AT)
+                                            VALUES
+                                                (@id, @lid, @elid, @mnt, @u, GETDATE())", conn, tx))
+                                        {
+                                            cmd2.Parameters.AddWithValue("@id", Guid.NewGuid().ToString());
+                                            cmd2.Parameters.AddWithValue("@lid", lettrageId);
+                                            cmd2.Parameters.AddWithValue("@elid", trLineId);
+                                            cmd2.Parameters.AddWithValue("@mnt", montant);
+                                            cmd2.Parameters.AddWithValue("@u", userId);
+                                            cmd2.ExecuteNonQuery();
+                                        }
+                                        insertedLineIds.Add(trLineId);
+                                    }
+                                }
+                            }
+
+                            // 4. Audit lettrage
+                            try
+                            {
+                                using (var cmdLog = new SqlCommand(@"
+                                    INSERT INTO SECURITY_LOG (USER_ID, ACTION, DETAILS, CREATED_AT)
+                                    VALUES (@u, 'LETTRAGE_AUTO', @d, GETDATE())", conn, tx))
+                                {
+                                    cmdLog.Parameters.AddWithValue("@u", userId);
+                                    cmdLog.Parameters.AddWithValue("@d",
+                                        lettrageCode + " / " + lettrageSources.Count + " OD réglées");
+                                    cmdLog.ExecuteNonQuery();
+                                }
+                            }
+                            catch { }
+                        }
+                        // ⭐ FIN du bloc lettrage
+
+                        // ═══════════════════════════════════════════════════════════
+                        // Incrément DERNIER_NUMERO du journal (existant)
+                        // ═══════════════════════════════════════════════════════════
                         if (!isEdit)
                         {
                             using (var cmdUpd = new SqlCommand(@"
@@ -322,7 +527,7 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                             }
                         }
 
-                        // Audit
+                        // Audit écriture (existant)
                         try
                         {
                             string ip = ctx.Request.UserHostAddress ?? "";
@@ -381,9 +586,27 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
         SqlConnection conn, SqlTransaction tx,
         string exerciceId, DateTime dateComptable, int userId)
     {
+        DateTime dDebut, dFin;
+        using (var cmd = new SqlCommand(@"
+            SELECT DATE_DEBUT, DATE_FIN FROM FEXERCICE
+             WHERE ID = @id AND STATUT = 'OUVERT' AND DELETION_AT IS NULL", conn, tx))
+        {
+            cmd.Parameters.AddWithValue("@id", exerciceId);
+            using (var r = cmd.ExecuteReader())
+            {
+                if (!r.Read()) throw new Exception("Exercice introuvable ou fermé.");
+                dDebut = Convert.ToDateTime(r["DATE_DEBUT"]).Date;
+                dFin   = Convert.ToDateTime(r["DATE_FIN"]).Date;
+            }
+        }
+
+        if (dateComptable.Date < dDebut || dateComptable.Date > dFin)
+            throw new Exception("La date comptable doit appartenir à l'exercice sélectionné.");
+
         using (var cmd = new SqlCommand(@"
             SELECT TOP 1 ID FROM FPERIODE
-             WHERE EXERCICE_ID = @ex AND @d BETWEEN DATE_DEBUT AND DATE_FIN
+             WHERE EXERCICE_ID = @ex AND STATUT = 'OUVERTE'
+               AND @d BETWEEN DATE_DEBUT AND DATE_FIN
              ORDER BY NUMERO", conn, tx))
         {
             cmd.Parameters.AddWithValue("@ex", exerciceId);
@@ -393,25 +616,11 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
         }
 
         using (var cmd = new SqlCommand(
-            "SELECT TOP 1 ID FROM FPERIODE WHERE EXERCICE_ID = @ex ORDER BY NUMERO", conn, tx))
+            "SELECT COUNT(1) FROM FPERIODE WHERE EXERCICE_ID = @ex", conn, tx))
         {
             cmd.Parameters.AddWithValue("@ex", exerciceId);
-            object o = cmd.ExecuteScalar();
-            if (o != null && o != DBNull.Value) return o.ToString();
-        }
-
-        DateTime dDebut, dFin;
-        using (var cmd = new SqlCommand(
-            "SELECT DATE_DEBUT, DATE_FIN FROM FEXERCICE WHERE ID = @id AND DELETION_AT IS NULL",
-            conn, tx))
-        {
-            cmd.Parameters.AddWithValue("@id", exerciceId);
-            using (var r = cmd.ExecuteReader())
-            {
-                if (!r.Read()) throw new Exception("Exercice introuvable.");
-                dDebut = Convert.ToDateTime(r["DATE_DEBUT"]);
-                dFin   = Convert.ToDateTime(r["DATE_FIN"]);
-            }
+            if (Convert.ToInt32(cmd.ExecuteScalar()) > 0)
+                throw new Exception("Aucune période ouverte ne correspond à la date comptable.");
         }
 
         string newId = Guid.NewGuid().ToString();

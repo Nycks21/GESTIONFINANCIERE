@@ -24,7 +24,7 @@ protected void Page_Load(object sender, EventArgs e)
         string maxUsersStr = AuthHelper.GetMaxUsersString();
         int maxUsers = int.Parse(maxUsersStr);
         
-        string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+        string connStr = AuthHelper.ConnectionString;
         int currentUsers = 0;
         
         using (SqlConnection conn = new SqlConnection(connStr))

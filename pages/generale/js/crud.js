@@ -10,6 +10,20 @@ function _esc(s) {
 }
 
 // ════════════════════════════════════════════════════════════
+// HELPER — visibilité conditionnelle de la case « Restreindre trésorerie »
+//   - Visible uniquement si CODE commence par "4" (spec §3)
+//   - Quand masquée, on force le décochage pour éviter des valeurs fantômes
+// ════════════════════════════════════════════════════════════
+function _syncRestrictionTresoVisibilite(code, checked) {
+    var grp = document.getElementById('grpRestrictionTreso');
+    var chk = document.getElementById('elementRestreindreTreso');
+    if (!grp || !chk) return;
+    var concerne = typeof code === 'string' && code.charAt(0) === '4';
+    grp.style.display = concerne ? '' : 'none';
+    chk.checked = concerne ? !!checked : false;
+}
+
+// ════════════════════════════════════════════════════════════
 // PLANS — CRUD par ORDRE
 // ════════════════════════════════════════════════════════════
 
@@ -215,12 +229,24 @@ function openAddElementModal(e) {
 
     populateParentSelect((AppState.currentLevel || 1) - 1, null);
 
+    // ─── grpAuxiliaire (logique existante, non modifiée) ───
     var planNiveau = (AppState.plan && AppState.plan.NIVEAU) ? AppState.plan.NIVEAU : 1;
     var grpAux = document.getElementById('grpAuxiliaire');
     var chkAux = document.getElementById('elementAuxiliaire');
     if (grpAux && chkAux) {
         chkAux.checked = false;
         grpAux.style.display = ((AppState.currentLevel || 1) === planNiveau) ? '' : 'none';
+    }
+
+    // ─── grpRestrictionTreso (nouvelle option) ───
+    _syncRestrictionTresoVisibilite('', false);
+    var codeEl = document.getElementById('elementCode');
+    if (codeEl && !codeEl._rtBound) {
+        codeEl._rtBound = true;
+        codeEl.addEventListener('input', function () {
+            var chk = document.getElementById('elementRestreindreTreso');
+            _syncRestrictionTresoVisibilite(codeEl.value || '', chk ? chk.checked : false);
+        });
     }
 
     clearErrors('#elementModal');
@@ -246,6 +272,7 @@ function editElement(id) {
 
     populateParentSelect((el.NIVEAU || 1) - 1, el.PARENT_ID);
 
+    // ─── grpAuxiliaire (logique existante, non modifiée) ───
     var grpAux = document.getElementById('grpAuxiliaire');
     var chkAux = document.getElementById('elementAuxiliaire');
     if (grpAux && chkAux) {
@@ -258,6 +285,9 @@ function editElement(id) {
             chkAux.checked = false;
         }
     }
+
+    // ─── grpRestrictionTreso (nouvelle option) ───
+    _syncRestrictionTresoVisibilite(el.CODE || '', !!el.RESTREINDRE_IMPUT_TRESO);
 
     clearErrors('#elementModal');
     document.getElementById('elementModal').style.display = 'flex';
@@ -294,6 +324,8 @@ async function saveElement(e) {
     var parentSel = document.getElementById('elementParent');
     var grpAux = document.getElementById('grpAuxiliaire');
     var chkAux = document.getElementById('elementAuxiliaire');
+    var grpRt = document.getElementById('grpRestrictionTreso');
+    var chkRt = document.getElementById('elementRestreindreTreso');
 
     var data = {
         id:             id,
@@ -302,7 +334,9 @@ async function saveElement(e) {
         libelle:        (document.getElementById('elementLibelle').value || '').trim(),
         parentId:       (parentSel && !parentSel.disabled) ? (parentSel.value || null) : null,
         active:         document.getElementById('elementActive').checked,
-        estAuxiliaire:  (grpAux && chkAux && grpAux.style.display !== 'none') ? chkAux.checked : false
+        estAuxiliaire:  (grpAux && chkAux && grpAux.style.display !== 'none') ? chkAux.checked : false,
+        // Nouvelle option — le serveur force false si code ne commence pas par 4
+        restreindreImputTreso: (grpRt && chkRt && grpRt.style.display !== 'none') ? !!chkRt.checked : false
     };
 
     clearErrors('#elementModal');

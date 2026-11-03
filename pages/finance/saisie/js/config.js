@@ -6,6 +6,7 @@ window.API = {
   LIST: "GetEcritures.ashx",
   DETAIL: "GetEcritureDetail.ashx",
   SAVE: "EcritureSave.ashx",
+  EDIT: "EcritureEdit.ashx",
   VALIDER: "EcritureValider.ashx",
   DELETE: "EcritureDelete.ashx",
   NEXT_NUMERO: "GetNextNumero.ashx",

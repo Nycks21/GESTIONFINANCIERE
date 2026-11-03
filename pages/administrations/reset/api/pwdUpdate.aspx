@@ -6,7 +6,7 @@
 <%@ Import Namespace="System.Text" %>
 
 <script runat="server">
-private string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+private string connStr = AuthHelper.ConnectionString;
 private const int MIN_PWD_LENGTH = 8;
 private const int MAX_PWD_LENGTH = 128;
 

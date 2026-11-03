@@ -20,11 +20,14 @@ public static class AuthHelperFinance
   {
     new AuthHelper.MenuItem { Code = "accueil",   Text = "menu.accueil",   Url = "/pages/accueil/index.aspx",                         Icon = "fas fa-chalkboard",       Section = "section.accueil",      Order = 1  },
     new AuthHelper.MenuItem { Code = "accueilc",  Text = "menu.accueilc",  Url = "/pages/finance/accueil/index.aspx",                 Icon = "fas fa-save",       Section = "section.applications", Order = 2  },
-    new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-cog",   Section = "section.saisie",   Order = 4  },
-    new AuthHelper.MenuItem { Code = "balance",   Text = "menu.balance",   Url = "/pages/finance/balanceGen/balance.aspx",  Icon = "fas fa-balance-scale",   Section = "section.exploitation",   Order = 5  },
-    new AuthHelper.MenuItem { Code = "balanceaux",   Text = "menu.balance.aux",   Url = "/pages/finance/balanceAux/balance-auxiliaire.aspx",  Icon = "fas fa-inbox",   Section = "section.exploitation",   Order = 6  },
-    new AuthHelper.MenuItem { Code = "livres",   Text = "menu.livres",   Url = "/pages/finance/saisie/liste-ecritures.aspx",  Icon = "fas fa-book",   Section = "section.exploitation",   Order = 7  },
-    new AuthHelper.MenuItem { Code = "marche",      Text = "menu.marche",      Url = "/pages/finance/marche/marche.aspx",         Icon = "fas fa-clipboard",   Section = "section.marche",   Order = 8  },
+    new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-pencil",   Section = "section.saisie",   Order = 4  },
+    new AuthHelper.MenuItem { Code = "correction",      Text = "menu.correction",      Url = "/pages/finance/saisie/correction.aspx",         Icon = "fas fa-magic",   Section = "section.saisie",   Order = 5  },
+    new AuthHelper.MenuItem { Code = "balance",   Text = "menu.balance",   Url = "/pages/finance/balanceGen/balance.aspx",  Icon = "fas fa-balance-scale",   Section = "section.exploitation",   Order = 6  },
+    new AuthHelper.MenuItem { Code = "balanceaux",   Text = "menu.balance.aux",   Url = "/pages/finance/balanceAux/balance-auxiliaire.aspx",  Icon = "fas fa-inbox",   Section = "section.exploitation",   Order = 7  },
+    new AuthHelper.MenuItem { Code = "livres",   Text = "menu.livres",   Url = "/pages/finance/grandLivre/grand-livre.aspx",  Icon = "fas fa-book",   Section = "section.exploitation",   Order = 8  },
+    new AuthHelper.MenuItem { Code = "lettrage",   Text = "menu.lettrage",   Url = "/pages/finance/lettrage/lettrage.aspx",  Icon = "fas fa-book",   Section = "section.traitement",   Order = 9  },
+    new AuthHelper.MenuItem { Code = "delletrage",   Text = "menu.delletrage",   Url = "/pages/finance/delletrage/delletrage.aspx",  Icon = "fas fa-book",   Section = "section.traitement",   Order = 10  },
+    new AuthHelper.MenuItem { Code = "marche",      Text = "menu.marche",      Url = "/pages/finance/marche/marche.aspx",         Icon = "fas fa-clipboard",   Section = "section.marche",   Order = 11  },
 
   };
 

@@ -108,7 +108,9 @@
                 <label data-i18n="liste_ecritures.filter.marche"></label>
                 <select v-model="vm.marcheId" @change="onFilterChange" class="form-control">
                   <option value="">{{ t('liste_ecritures.filter.all_marches') }}</option>
-                  <option v-for="m in marches" :key="m.ID" :value="m.ID">{{ m.CODE }}</option>
+                  <option v-for="m in marches" :key="m.ID" :value="m.ID">
+                    {{ m.NUMERO }} — {{ m.DESCRIPTION }}
+                  </option>
                 </select>
               </div>
 

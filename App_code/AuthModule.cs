@@ -59,6 +59,18 @@ public class AuthModule : IHttpModule
             if (IsStaticResource(path))
                 return;
 
+            if (IsConfigurationPath(path))
+                return;
+
+            DatabaseHealth databaseHealth = DatabaseConnectionHelper.GetCachedHealth();
+            if (!databaseHealth.IsConnected)
+            {
+                if (IsLoginPath(path) && !AuthHelper.IsLicenceValid())
+                    return;
+                RedirectToDatabaseConfiguration(ctx);
+                return;
+            }
+
             // ────────────────────────────────────────────────────────
             // 2) Pages publiques (Login / Logout / EstablishSession)
             //    → laisser passer sans contrôle d'authentification
@@ -134,6 +146,30 @@ public class AuthModule : IHttpModule
                 return true;
         }
         return false;
+    }
+
+    private static bool IsConfigurationPath(string path)
+    {
+        if (String.IsNullOrEmpty(path)) return false;
+        int lastSlash = path.LastIndexOf('/');
+        string page = path.Substring(lastSlash + 1);
+        return page == "configurationbdd" || page == "configurationbdd.aspx";
+    }
+
+    private static bool IsLoginPath(string path)
+    {
+        if (String.IsNullOrEmpty(path)) return false;
+        int lastSlash = path.LastIndexOf('/');
+        string page = path.Substring(lastSlash + 1);
+        return page == "login" || page == "login.aspx";
+    }
+
+    private static void RedirectToDatabaseConfiguration(HttpContext ctx)
+    {
+        if (ctx.Response.IsRequestBeingRedirected) return;
+
+        ctx.Response.Redirect(VirtualPathUtility.ToAbsolute("~/ConfigurationBDD.aspx"), false);
+        ctx.ApplicationInstance.CompleteRequest();
     }
 
     /// <summary>

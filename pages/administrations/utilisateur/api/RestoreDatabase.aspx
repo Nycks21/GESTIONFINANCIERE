@@ -435,15 +435,11 @@ private string GetDefaultDataDirectory(SqlConnection conn)
 // ═══════════════════════════════════════════════════════════════
 private string BuildMasterConnectionString()
 {
-    var masterCs = ConfigurationManager.ConnectionStrings["MasterConnection"];
-    if (masterCs != null && !string.IsNullOrEmpty(masterCs.ConnectionString))
-        return ForceMasterOnConnectionString(masterCs.ConnectionString);
-
-    var appCs = ConfigurationManager.ConnectionStrings["MaConnexion"];
-    if (appCs == null || string.IsNullOrEmpty(appCs.ConnectionString))
+    string masterConnectionString = DatabaseConnectionHelper.MasterConnectionString;
+    if (string.IsNullOrEmpty(masterConnectionString))
         return null;
 
-    return ForceMasterOnConnectionString(appCs.ConnectionString);
+    return ForceMasterOnConnectionString(masterConnectionString);
 }
 
 private string ForceMasterOnConnectionString(string connStr)
@@ -502,10 +498,10 @@ private string ForceMasterOnConnectionString(string connStr)
 // ═══════════════════════════════════════════════════════════════
 private string GetApplicationDatabaseName()
 {
-    var cs = ConfigurationManager.ConnectionStrings["MaConnexion"];
-    if (cs != null && !string.IsNullOrEmpty(cs.ConnectionString))
+    string cs = AuthHelper.ConnectionString;
+    if (!string.IsNullOrEmpty(cs))
     {
-        string name = ExtractDatabaseFromConnectionString(cs.ConnectionString);
+        string name = ExtractDatabaseFromConnectionString(cs);
         if (!string.IsNullOrEmpty(name)) return name;
     }
     return null;

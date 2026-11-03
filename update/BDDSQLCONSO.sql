@@ -23,12 +23,28 @@
 --     • la ré-insertion avec la même clé après suppression
 --     • plus d'erreur SQL 2627 lors des modifications
 --
+-- ⭐ NOUVELLE FEATURE — RESTREINDRE_IMPUT_TRESO (sur PLAN1..PLAN10) :
+--   • Colonne BIT NOT NULL DEFAULT 0 sur PLAN1..PLAN10
+--   • Sert à restreindre les imputations comptables en journal de
+--     trésorerie (CATEGORIE_JOURNAL = 2) pour les comptes 4xx.
+--   • Défaut 0 ⇒ comportement actuel intégralement préservé.
+--   • Seed : 401200 (Gamma) passe à 1 pour test manuel.
+--
+-- ⭐ NOUVELLE FEATURE — CATEGORIE_JOURNAL sur FECRITURE_LIGNE :
+--   • Colonne TINYINT NOT NULL DEFAULT 1 (1 = OD, 2 = TRESORERIE)
+--   • Aligné sur FJOURNAL.CATEGORIE_JOURNAL
+--
+-- ⭐ NOUVELLE FEATURE — LETTRAGE (TRG_FECL_LETTRABLE) :
+--   • Un trigger met automatiquement LETTRABLE = 1 pour les comptes 4xxxx
+--   • Permet à la page Lettrage de fonctionner immédiatement.
+--
 -- ⭐ SEED INTÉGRÉ :
 --   • 3 comptes collectifs fournisseurs 401000, 401100, 401200
---   • 3 auxiliaires FTIERS rattachés
+--   • 4 auxiliaires FTIERS rattachés
 --   • Articles ART001/ART002/ART003
 --   • Monnaies MGA/EUR/USD
 --   • Exercice 2026 OUVERT + 12 périodes
+--   • 2 Écritures de test pour le compte 401000 (Facture + Règlement)
 -- ============================================================
 
 SET NOCOUNT ON;
@@ -68,7 +84,6 @@ CREATE TABLE USERROLE
 PRINT 'OK - USERROLE';
 GO
 
--- ⭐ USERS : USERNAME et EMAIL en index filtrés (soft-delete friendly)
 CREATE TABLE USERS
 (
     IDUSER           INT IDENTITY(1,1) PRIMARY KEY,
@@ -140,7 +155,7 @@ PRINT 'OK - Roles + SuperAdmin inseres';
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 2. SOCLE STOCK (⭐ SANS SFOURNISSEUR)
+-- 2. SOCLE STOCK
 -- ═══════════════════════════════════════════════════════════
 
 CREATE TABLE SUNITE_SEQUENCE (
@@ -242,7 +257,6 @@ CREATE INDEX IX_MARTICLE_CODE ON MARTICLE(CODE);
 PRINT 'OK - MARTICLE';
 GO
 
--- ⭐ SSTOCK : UQ_STOCK_ARTICLE_EMPLACEMENT converti en index filtré
 CREATE TABLE SSTOCK (
     ID                  INT PRIMARY KEY IDENTITY(1,1),
     ARTICLE_ID          UNIQUEIDENTIFIER NOT NULL FOREIGN KEY REFERENCES MARTICLE(ID),
@@ -387,7 +401,6 @@ GO
 -- 3. SOCLE FINANCE — RÉFÉRENTIELS DE BASE
 -- ═══════════════════════════════════════════════════════════
 
--- ⭐ FSITE : UQ_FSITE_CODE converti en index filtré
 CREATE TABLE FSITE (
     ID              UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
     CODE            VARCHAR(2)   NOT NULL,
@@ -416,7 +429,6 @@ INSERT INTO FSITE (CODE, NOM, EN_COURS, ACTIVE) VALUES
     ('01', N'Siège',                 1, 1);
 PRINT 'OK - 2 Sites';
 
--- ⭐ FMONNAIE : UQ_FMONNAIE_CODE converti en index filtré
 CREATE TABLE FMONNAIE (
     ID              UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
     CODE            VARCHAR(10) NOT NULL,
@@ -448,7 +460,6 @@ INSERT INTO FMONNAIE (CODE, NOM, SYMBOLE, DECIMALES, EST_REFERENCE, ACTIVE) VALU
     ('USD', N'Dollar US',       N'$',  2, 0, 1);
 PRINT 'OK - 3 Monnaies';
 
--- ⭐ FTAUX_CHANGE : UQ_FTAUX_CHANGE converti en index filtré
 CREATE TABLE FTAUX_CHANGE (
     ID                  UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
     MONNAIE_SOURCE_ID   UNIQUEIDENTIFIER NOT NULL,
@@ -478,7 +489,6 @@ CREATE UNIQUE INDEX UQ_FTAUX_CHANGE
 PRINT 'OK - FTAUX_CHANGE';
 GO
 
--- ⭐ FEXERCICE : UQ_FEXERCICE_CODE converti en index filtré
 CREATE TABLE FEXERCICE (
     ID              UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
     CODE            VARCHAR(20) NOT NULL,
@@ -611,7 +621,6 @@ GO
 
 -- ═══════════════════════════════════════════════════════════
 -- 4. CRÉATION DES 10 TABLES PLAN1..PLAN10
---    (déjà en index filtré)
 -- ═══════════════════════════════════════════════════════════
 
 DECLARE @i INT = 1;
@@ -635,6 +644,7 @@ BEGIN
         NATURE          VARCHAR(30) NULL,
         ACTIVE          BIT NOT NULL DEFAULT 1,
         EST_AUXILIAIRE  BIT NOT NULL DEFAULT 0,
+        RESTREINDRE_IMPUT_TRESO BIT NOT NULL DEFAULT 0,
         CREATED_BY      INT NULL,
         CREATED_AT      DATETIME NOT NULL DEFAULT GETDATE(),
         UPDATED_BY      INT NULL,
@@ -654,6 +664,7 @@ BEGIN
     CREATE INDEX IX_' + @tbl + '_AUXILIAIRE ON ' + @tbl + '(EST_AUXILIAIRE, ACTIVE) WHERE EST_AUXILIAIRE = 1;
     CREATE INDEX IX_' + @tbl + '_NIVEAU ON ' + @tbl + '(NIVEAU, ORDRE) WHERE DELETION_AT IS NULL;
     CREATE INDEX IX_' + @tbl + '_PARENT ON ' + @tbl + '(PARENT_ID) WHERE PARENT_ID IS NOT NULL;
+    CREATE INDEX IX_' + @tbl + '_RESTREINDRE ON ' + @tbl + '(RESTREINDRE_IMPUT_TRESO) WHERE RESTREINDRE_IMPUT_TRESO = 1;
     ';
 
     EXEC sp_executesql @sql;
@@ -663,14 +674,13 @@ END;
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 5. (section déplacée) — FK FOURNISSEUR ajoutées après
---    création de FTIERS en section 6bis ci-dessous
+-- 5. (section déplacée)
 -- ═══════════════════════════════════════════════════════════
 PRINT 'OK - Section 5 : FK FOURNISSEUR ajoutées après FTIERS';
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 6. TIERS (⭐ UQ_FTIERS_CODE converti en index filtré)
+-- 6. TIERS
 -- ═══════════════════════════════════════════════════════════
 
 CREATE TABLE FTIERS
@@ -706,7 +716,7 @@ PRINT 'OK - FTIERS';
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 6bis. FK FOURNISSEUR → FTIERS (maintenant que FTIERS existe)
+-- 6bis. FK FOURNISSEUR → FTIERS
 -- ═══════════════════════════════════════════════════════════
 
 ALTER TABLE dbo.MARTICLE
@@ -721,7 +731,7 @@ PRINT 'OK - FK_SENTREE_FTIERS_FOURNISSEUR';
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 7. JOURNAUX (⭐ UQ_FJOURNAL_CODE converti en index filtré)
+-- 7. JOURNAUX
 -- ═══════════════════════════════════════════════════════════
 
 CREATE TABLE FJOURNAL
@@ -747,13 +757,18 @@ CREATE TABLE FJOURNAL
     CONSTRAINT CK_FJOURNAL_TYPE CHECK (TYPE_JOURNAL IN ('ACHATS','VENTES','BANQUE','CAISSE','OPERATIONS_DIVERSES','GENERAL')),
     CONSTRAINT CK_FJOURNAL_CATEGORIE CHECK (CATEGORIE_JOURNAL IN (1, 2)),
     CONSTRAINT CK_FJOURNAL_PLAN_ORDER CHECK (PLAN_ORDER IS NULL OR PLAN_ORDER BETWEEN 1 AND 10),
+    CONSTRAINT CK_FJOURNAL_CATEGORIE_COHERENTE CHECK (
+        (TYPE_JOURNAL IN ('BANQUE','CAISSE')              AND CATEGORIE_JOURNAL = 2)
+        OR
+        (TYPE_JOURNAL IN ('ACHATS','VENTES','OPERATIONS_DIVERSES','GENERAL') AND CATEGORIE_JOURNAL = 1)
+    ),
     CONSTRAINT FK_FJOURNAL_MONNAIE        FOREIGN KEY (MONNAIE_ID)  REFERENCES FMONNAIE(ID),
     CONSTRAINT FK_FJOURNAL_CREATED_BY     FOREIGN KEY (CREATED_BY)  REFERENCES USERS(IDUSER),
     CONSTRAINT FK_FJOURNAL_UPDATED_BY     FOREIGN KEY (UPDATED_BY)  REFERENCES USERS(IDUSER),
     CONSTRAINT FK_FJOURNAL_DELETION_BY    FOREIGN KEY (DELETION_BY) REFERENCES USERS(IDUSER)
 );
 CREATE UNIQUE INDEX UQ_FJOURNAL_CODE ON FJOURNAL(CODE) WHERE DELETION_AT IS NULL;
-PRINT 'OK - FJOURNAL';
+PRINT 'OK - FJOURNAL (+ CK_FJOURNAL_CATEGORIE_COHERENTE)';
 GO
 
 CREATE TABLE FJOURNAL_SITE
@@ -772,7 +787,6 @@ GO
 
 -- ═══════════════════════════════════════════════════════════
 -- 8. ÉCRITURES COMPTABLES
---    (pas de DELETION_AT — contraintes UNIQUE inchangées)
 -- ═══════════════════════════════════════════════════════════
 
 CREATE TABLE FECRITURE
@@ -831,6 +845,7 @@ CREATE TABLE FECRITURE_LIGNE
     COMPTE_PLAN_ORDER     TINYINT NULL,
     TIERS_ID              UNIQUEIDENTIFIER NULL,
     AUXILIAIRE            NVARCHAR(50) NULL,
+    CATEGORIE_JOURNAL     TINYINT NOT NULL DEFAULT 1,
     LIBELLE               NVARCHAR(500) NULL,
     SENS                  CHAR(1) NULL,
     MONTANT               DECIMAL(19,4) NULL,
@@ -868,6 +883,7 @@ CREATE TABLE FECRITURE_LIGNE
     ),
     CONSTRAINT CK_FECL_COMPTE_PLAN_ORDER CHECK (COMPTE_PLAN_ORDER IS NULL OR COMPTE_PLAN_ORDER BETWEEN 1 AND 10),
     CONSTRAINT CK_FECL_OP_PLAN_ORDER CHECK (OP_PLAN_ORDER IS NULL OR OP_PLAN_ORDER BETWEEN 1 AND 10),
+    CONSTRAINT CK_FECL_CATEGORIE CHECK (CATEGORIE_JOURNAL IN (1, 2)),
     CONSTRAINT CK_FECL_MODE_REG CHECK (
         MODE_REGULARISATION IS NULL
         OR MODE_REGULARISATION IN ('VIREMENT','ESPECE','CHEQUE','MOBILE_MONEY','CARTE','AUTRE')
@@ -877,7 +893,44 @@ CREATE TABLE FECRITURE_LIGNE
     CONSTRAINT FK_FECRITURE_LIGNE_CREATED_BY FOREIGN KEY (CREATED_BY) REFERENCES USERS(IDUSER),
     CONSTRAINT FK_FECRITURE_LIGNE_UPDATED_BY FOREIGN KEY (UPDATED_BY) REFERENCES USERS(IDUSER)
 );
-PRINT 'OK - FECRITURE_LIGNE';
+
+CREATE NONCLUSTERED INDEX IX_FECL_CATEGORIE_TRESO
+    ON FECRITURE_LIGNE (CATEGORIE_JOURNAL)
+    INCLUDE (ECRITURE_ID, COMPTE_ID, COMPTE_PLAN_ORDER, TIERS_ID)
+    WHERE CATEGORIE_JOURNAL = 2;
+
+CREATE INDEX IX_FECL_COMPTE ON FECRITURE_LIGNE(COMPTE_ID, COMPTE_PLAN_ORDER);
+PRINT 'OK - FECRITURE_LIGNE (+ CATEGORIE_JOURNAL + index filtré)';
+GO
+
+-- ⭐ NOUVEAU : Trigger pour mettre automatiquement LETTRABLE = 1 pour les comptes 4xxxx
+CREATE TRIGGER TRG_FECL_LETTRABLE
+ON FECRITURE_LIGNE
+AFTER INSERT, UPDATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Mettre à jour LETTRABLE = 1 si le compte associé est un compte de tiers (4xxxx)
+    UPDATE fl
+    SET LETTRABLE = 1
+    FROM FECRITURE_LIGNE fl
+    INNER JOIN INSERTED i ON i.ID = fl.ID
+    INNER JOIN VW_ALL_PLAN_ELEMENTS v ON v.ID = fl.COMPTE_ID
+    WHERE v.CODE LIKE '4%'
+      AND (fl.LETTRABLE IS NULL OR fl.LETTRABLE = 0);
+
+    -- Mettre à jour LETTRABLE = 0 si le compte n'est PAS un compte de tiers
+    UPDATE fl
+    SET LETTRABLE = 0
+    FROM FECRITURE_LIGNE fl
+    INNER JOIN INSERTED i ON i.ID = fl.ID
+    INNER JOIN VW_ALL_PLAN_ELEMENTS v ON v.ID = fl.COMPTE_ID
+    WHERE v.CODE NOT LIKE '4%'
+      AND (fl.LETTRABLE IS NULL OR fl.LETTRABLE = 1);
+END
+GO
+PRINT 'OK - Trigger TRG_FECL_LETTRABLE créé';
 GO
 
 CREATE TABLE FECRITURE_HISTORIQUE
@@ -906,7 +959,6 @@ GO
 -- 9. LETTRAGE + RELEVÉS + RAPPROCHEMENT
 -- ═══════════════════════════════════════════════════════════
 
--- ⭐ FLETTRAGE : UQ_FLETTRAGE_CODE converti en index filtré
 CREATE TABLE FLETTRAGE
 (
     ID              UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
@@ -1009,7 +1061,6 @@ GO
 -- 10. PARAMÉTRAGE
 -- ═══════════════════════════════════════════════════════════
 
--- ⭐ FPARAMETRE_SECTION : UQ_FPARAMETRE_SECTION_CODE converti en index filtré
 CREATE TABLE FPARAMETRE_SECTION
 (
     ID           UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
@@ -1088,16 +1139,16 @@ GO
 -- ═══════════════════════════════════════════════════════════
 
 CREATE VIEW VW_ALL_PLAN_ELEMENTS AS
-SELECT 1 AS PLAN_ORDER, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN1 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 2, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN2 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 3, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN3 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 4, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN4 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 5, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN5 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 6, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN6 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 7, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN7 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 8, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN8 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 9, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN9 WHERE DELETION_AT IS NULL
-UNION ALL SELECT 10, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE FROM PLAN10 WHERE DELETION_AT IS NULL;
+SELECT 1 AS PLAN_ORDER, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN1  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 2, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN2  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 3, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN3  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 4, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN4  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 5, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN5  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 6, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN6  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 7, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN7  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 8, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN8  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 9, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN9  WHERE DELETION_AT IS NULL
+UNION ALL SELECT 10, ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE, TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO FROM PLAN10 WHERE DELETION_AT IS NULL;
 GO
 
 CREATE VIEW VW_PLAN_HEADERS AS
@@ -1109,7 +1160,7 @@ LEFT JOIN FPLAN_TYPE pt ON pt.CODE = h.PLAN_TYPE_CODE;
 GO
 
 -- ═══════════════════════════════════════════════════════════
--- 12. SOCLE FMARCHE (⭐ UQ_FMARCHE_NUMERO en index filtré)
+-- 12. SOCLE FMARCHE
 -- ═══════════════════════════════════════════════════════════
 
 CREATE TABLE FMARCHE
@@ -1237,7 +1288,6 @@ CREATE TABLE FMARCHE_HISTORIQUE
 PRINT 'OK - FMARCHE_HISTORIQUE';
 GO
 
--- ⭐ FMARCHE_AVENANT : UQ_FMARCHE_AVENANT_NUMERO converti en index filtré
 CREATE TABLE FMARCHE_AVENANT
 (
     ID                UNIQUEIDENTIFIER NOT NULL DEFAULT NEWSEQUENTIALID(),
@@ -1293,16 +1343,18 @@ PRINT 'OK - Exercice 2026 + 12 périodes';
 DECLARE @c401000 UNIQUEIDENTIFIER = NEWID();
 DECLARE @c401100 UNIQUEIDENTIFIER = NEWID();
 DECLARE @c401200 UNIQUEIDENTIFIER = NEWID();
+DECLARE @c601000 UNIQUEIDENTIFIER = NEWID();
+DECLARE @c512000 UNIQUEIDENTIFIER = NEWID();
 
-INSERT INTO PLAN1 (ID, CODE, LIBELLE, NIVEAU, ORDRE, TYPE_ELEMENT, ACTIVE, EST_AUXILIAIRE) VALUES
-    (@c401000, '401000', N'Fournisseur Alpha SARL',  1, 1, 'DETAIL', 1, 1),
-    (@c401100, '401100', N'Fournisseur Beta SA',     1, 2, 'DETAIL', 1, 1),
-    (@c401200, '401200', N'Fournisseur Gamma SRL',   1, 3, 'DETAIL', 1, 1);
+INSERT INTO PLAN1 (ID, CODE, LIBELLE, NIVEAU, ORDRE, TYPE_ELEMENT, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO) VALUES
+    (@c401000, '401000', N'Fournisseur Alpha SARL',  1, 1, 'DETAIL', 1, 1, 0),
+    (@c401100, '401100', N'Fournisseur Beta SA',     1, 2, 'DETAIL', 1, 1, 0),
+    (@c401200, '401200', N'Fournisseur Gamma SRL',   1, 3, 'DETAIL', 1, 1, 1);
 
-INSERT INTO PLAN1 (CODE, LIBELLE, NIVEAU, ORDRE, TYPE_ELEMENT, ACTIVE, EST_AUXILIAIRE) VALUES
-    ('411000', N'Clients - Compte collectif', 1, 4, 'DETAIL', 1, 1),
-    ('601000', N'Achats de fournitures',      1, 5, 'DETAIL', 1, 0),
-    ('512000', N'Banque',                     1, 6, 'DETAIL', 1, 0);
+INSERT INTO PLAN1 (ID, CODE, LIBELLE, NIVEAU, ORDRE, TYPE_ELEMENT, ACTIVE, EST_AUXILIAIRE, RESTREINDRE_IMPUT_TRESO) VALUES
+    ('411000', N'Clients - Compte collectif', 1, 4, 'DETAIL', 1, 1, 0),
+    (@c601000, '601000', N'Achats de fournitures',      1, 5, 'DETAIL', 1, 0, 0),
+    (@c512000, '512000', N'Banque',                     1, 6, 'DETAIL', 1, 0, 0);
 PRINT 'OK - 3 comptes fournisseurs + 3 comptes complémentaires dans PLAN1';
 
 -- ─── Auxiliaires (FTIERS rattachés aux comptes collectifs) ───
@@ -1324,13 +1376,52 @@ PRINT 'OK - 3 Articles';
 DECLARE @mgaId UNIQUEIDENTIFIER;
 SELECT @mgaId = ID FROM FMONNAIE WHERE CODE = 'MGA';
 
-INSERT INTO FJOURNAL (CODE, LIBELLE, TYPE_JOURNAL, CATEGORIE_JOURNAL, MONNAIE_ID, ACTIVE) VALUES
-    ('AC', N'Journal des Achats',   'ACHATS',              1, @mgaId, 1),
-    ('VE', N'Journal des Ventes',   'VENTES',              1, @mgaId, 1),
-    ('BQ', N'Journal de Banque',    'BANQUE',              2, @mgaId, 1),
-    ('CA', N'Journal de Caisse',    'CAISSE',              2, @mgaId, 1),
-    ('OD', N'Opérations Diverses',  'OPERATIONS_DIVERSES', 1, @mgaId, 1);
-PRINT 'OK - 5 Journaux';
+INSERT INTO FJOURNAL (ID, CODE, LIBELLE, TYPE_JOURNAL, CATEGORIE_JOURNAL, MONNAIE_ID, ACTIVE) VALUES
+    (NEWID(), 'AC', N'Journal des Achats',   'ACHATS',              1, @mgaId, 1),
+    (NEWID(), 'VE', N'Journal des Ventes',   'VENTES',              1, @mgaId, 1),
+    (NEWID(), 'BQ', N'Journal de Banque',    'BANQUE',              2, @mgaId, 1),
+    (NEWID(), 'CA', N'Journal de Caisse',    'CAISSE',              2, @mgaId, 1),
+    (NEWID(), 'OD', N'Opérations Diverses',  'OPERATIONS_DIVERSES', 1, @mgaId, 1);
+PRINT 'OK - 5 Journaux (BQ et CA = CATEGORIE_JOURNAL 2 = trésorerie)';
+
+-- ⭐ NOUVEAU : Écritures de test pour le LETTRAGE ───
+DECLARE @journalAC UNIQUEIDENTIFIER;
+DECLARE @journalBQ UNIQUEIDENTIFIER;
+SELECT @journalAC = ID FROM FJOURNAL WHERE CODE = 'AC';
+SELECT @journalBQ = ID FROM FJOURNAL WHERE CODE = 'BQ';
+DECLARE @periodeJanvier UNIQUEIDENTIFIER;
+SELECT @periodeJanvier = ID FROM FPERIODE WHERE EXERCICE_ID = @exerciceId AND NUMERO = 1;
+
+-- Écriture 1 : Facture d'achat Alpha (Débit 601000, Crédit 401000)
+DECLARE @ecr1 UNIQUEIDENTIFIER = NEWID();
+INSERT INTO FECRITURE (ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, MONNAIE_ID, NUMERO, DATE_COMPTABLE, LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT, CREATED_AT)
+VALUES (@ecr1, @exerciceId, @periodeJanvier, @journalAC, @mgaId, 'ECR-001', '2026-01-15', 'Facture Alpha - Janvier 2026', 1000.00, 1000.00, 'VALIDEE', GETDATE());
+
+INSERT INTO FECRITURE_LIGNE (ID, ECRITURE_ID, ORDRE, COMPTE_ID, COMPTE_PLAN_ORDER, LIBELLE, SENS, MONTANT, CATEGORIE_JOURNAL, CREATED_AT)
+VALUES
+    (NEWID(), @ecr1, 1, @c601000, 1, 'Achat fournitures Alpha', 'D', 1000.00, 1, GETDATE()),
+    (NEWID(), @ecr1, 2, @c401000, 1, 'Facture Alpha',           'C', 1000.00, 1, GETDATE());
+
+-- Écriture 2 : Règlement Alpha par Banque (Débit 401000, Crédit 512000)
+DECLARE @ecr2 UNIQUEIDENTIFIER = NEWID();
+INSERT INTO FECRITURE (ID, EXERCICE_ID, PERIODE_ID, JOURNAL_ID, MONNAIE_ID, NUMERO, DATE_COMPTABLE, LIBELLE, TOTAL_DEBIT, TOTAL_CREDIT, STATUT, CREATED_AT)
+VALUES (@ecr2, @exerciceId, @periodeJanvier, @journalBQ, @mgaId, 'ECR-002', '2026-01-20', 'Règlement Alpha - Janvier 2026', 1000.00, 1000.00, 'VALIDEE', GETDATE());
+
+INSERT INTO FECRITURE_LIGNE (ID, ECRITURE_ID, ORDRE, COMPTE_ID, COMPTE_PLAN_ORDER, LIBELLE, SENS, MONTANT, CATEGORIE_JOURNAL, CREATED_AT)
+VALUES
+    (NEWID(), @ecr2, 1, @c401000, 1, 'Règlement Alpha', 'D', 1000.00, 2, GETDATE()),
+    (NEWID(), @ecr2, 2, @c512000, 1, 'Banque',          'C', 1000.00, 2, GETDATE());
+
+PRINT 'OK - 2 écritures de test pour le compte 401000';
+
+-- ⭐ SÉCURITÉ : Forcer LETTRABLE = 1 sur toutes les lignes 4xxxx existantes (au cas où le trigger a raté)
+UPDATE fl
+SET LETTRABLE = 1
+FROM FECRITURE_LIGNE fl
+INNER JOIN VW_ALL_PLAN_ELEMENTS v ON v.ID = fl.COMPTE_ID
+WHERE v.CODE LIKE '4%'
+  AND (fl.LETTRABLE IS NULL OR fl.LETTRABLE = 0);
+PRINT 'OK - Lignes 4xxxx marquées comme lettrables';
 
 -- ═══════════════════════════════════════════════════════════
 -- 14. VÉRIFICATION FINALE
@@ -1359,101 +1450,27 @@ SELECT 'JOURNAUX',             COUNT(*) FROM FJOURNAL       WHERE ACTIVE = 1 AND
 
 PRINT '';
 PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — TOUS LES INDEX UNIQUE DOIVENT ÊTRE FILTRÉS';
-PRINT '══════════════════════════════════════════';
-
-SELECT
-    t.name AS Table_Name,
-    i.name AS Index_Name,
-    CASE i.has_filter WHEN 1 THEN '✅ FILTRÉ' ELSE '❌ NON FILTRÉ' END AS Statut,
-    i.filter_definition
-FROM sys.indexes i
-INNER JOIN sys.tables t ON t.object_id = i.object_id
-WHERE i.is_unique = 1
-  AND i.is_primary_key = 0
-  AND EXISTS (
-      SELECT 1 FROM sys.columns c
-      WHERE c.object_id = i.object_id AND c.name = 'DELETION_AT'
-  )
-ORDER BY t.name, i.name;
-
-PRINT '';
-PRINT '⚠️  ATTENDU : tous les index avec DELETION_AT doivent être FILTRÉS';
-PRINT '';
-
-PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — FK de FMARCHE';
+PRINT 'VÉRIFICATION — DONNÉES LETTRAGE';
 PRINT '══════════════════════════════════════════';
 SELECT
-    fk.name AS FK_Name,
-    OBJECT_NAME(fk.referenced_object_id) AS Referenced_Table
-FROM sys.foreign_keys fk
-WHERE OBJECT_NAME(fk.parent_object_id) = 'FMARCHE'
-ORDER BY fk.name;
+    'Lignes 401000'          AS Info,
+    COUNT(*)                 AS Nb
+FROM FECRITURE_LIGNE l
+INNER JOIN PLAN1 p ON p.ID = l.COMPTE_ID
+WHERE p.CODE = '401000'
+UNION ALL
+SELECT 'Lignes lettrables', COUNT(*) FROM FECRITURE_LIGNE WHERE LETTRABLE = 1
+UNION ALL
+SELECT 'Lignes non lettrées', COUNT(*) FROM FECRITURE_LIGNE l
+WHERE l.LETTRABLE = 1 AND NOT EXISTS (
+    SELECT 1 FROM FLETTRAGE_LIGNE fll WHERE fll.ECRITURE_LIGNE_ID = l.ID
+);
 
 PRINT '';
 PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — Cascade FOURNISSEUR (PLAN1) → AUXILIAIRES (FTIERS)';
-PRINT '══════════════════════════════════════════';
-SELECT
-    p.CODE AS Fournisseur,
-    p.LIBELLE AS NomFournisseur,
-    t.CODE AS Auxiliaire,
-    t.NOM  AS NomAuxiliaire
-FROM PLAN1 p
-LEFT JOIN FTIERS t
-    ON t.PLAN_ELEMENT_ID = p.ID
-   AND t.ACTIVE = 1
-   AND t.DELETION_AT IS NULL
-WHERE p.CODE LIKE '4%'
-  AND p.ACTIVE = 1
-  AND p.DELETION_AT IS NULL
-ORDER BY p.CODE, t.CODE;
-
-PRINT '';
-PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — Plus aucune FK vers SFOURNISSEUR';
-PRINT '══════════════════════════════════════════';
-SELECT
-    fk.name AS FK_Name,
-    OBJECT_NAME(fk.parent_object_id) AS Source_Table
-FROM sys.foreign_keys fk
-WHERE fk.referenced_object_id = OBJECT_ID('dbo.SFOURNISSEUR');
--- ⚠️ 0 ligne attendue (SFOURNISSEUR n'existe plus)
-
-PRINT '';
-PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — FK FOURNISSEUR vers FTIERS';
-PRINT '══════════════════════════════════════════';
-SELECT
-    fk.name AS FK_Name,
-    OBJECT_NAME(fk.parent_object_id) AS Source_Table,
-    OBJECT_NAME(fk.referenced_object_id) AS Target_Table
-FROM sys.foreign_keys fk
-WHERE fk.name LIKE '%FOURNISSEUR%'
-  AND fk.name LIKE '%TIERS%'
-ORDER BY fk.name;
-
-PRINT '';
-PRINT '⚠️  ATTENDU : 3 lignes, toutes vers FTIERS';
-PRINT '     • FK_MARTICLE_FTIERS_FOURNISSEUR → FTIERS';
-PRINT '     • FK_SENTREE_FTIERS_FOURNISSEUR  → FTIERS';
-PRINT '     • FK_FMARCHE_FTIERS_FOURNISSEUR  → FTIERS';
+PRINT '⚠️  ATTENDU : Lignes lettrables > 0';
 PRINT '';
 
-PRINT '══════════════════════════════════════════';
-PRINT 'VÉRIFICATION — Aucune FK FOURNISSEUR ne pointe encore sur PLAN1';
-PRINT '══════════════════════════════════════════';
-SELECT
-    fk.name AS FK_Name,
-    OBJECT_NAME(fk.parent_object_id) AS Source_Table,
-    OBJECT_NAME(fk.referenced_object_id) AS Target_Table
-FROM sys.foreign_keys fk
-WHERE fk.name LIKE '%FOURNISSEUR%'
-  AND fk.referenced_object_id = OBJECT_ID('dbo.PLAN1');
--- ⚠️ 0 ligne attendue
-
-PRINT '';
 PRINT '══════════════════════════════════════════';
 PRINT 'OK - RECONSTRUCTION TERMINÉE';
 PRINT '══════════════════════════════════════════';

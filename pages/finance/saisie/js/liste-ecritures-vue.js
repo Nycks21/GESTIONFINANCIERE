@@ -10,12 +10,13 @@
                 search: '', journalId: '', statut: '',
                 exerciceId: '', dateDebut: '', dateFin: '',
                 datePieceDebut: '', datePieceFin: '',
-                numeroPiece: '', compte: '', tiers: '', marche: '',
+                numeroPiece: '', compte: '', tiers: '', marcheId: '',
                 ecritures: [], expanded: {}, linesCache: {},
                 page: 1, pageSize: 50, total: 0
             });
             const exercices   = ref([]);
             const journaux    = ref([]);
+            const marches     = ref([]);
             const activePlans = ref([]);
 
             // ── Lookups (exercices, journaux, plans) ──
@@ -23,17 +24,34 @@
                 try {
                     const url = API.BASE + API.HANDLERS_PATH + API.LOOKUPS;
                     const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' lors du chargement des référentiels.');
                     const data = await resp.json();
-                    if (data.success) {
-                        exercices.value = data.exercices || [];
-                        journaux.value  = data.journaux  || [];
-                        activePlans.value = (data.plans || []).map((p, i) => ({
-                            key: 'p' + i,
-                            ordre: p.ORDRE || i + 1,
-                            label: p.LABEL || 'PLAN' + (i + 1)
-                        }));
-                    }
-                } catch (err) { console.error('[liste-vue] loadLookups', err); }
+                    if (!data.success) throw new Error(data.message || 'Impossible de charger les référentiels.');
+                    exercices.value = data.exercices || [];
+                    journaux.value  = data.journaux  || [];
+                    activePlans.value = (data.plansActifs || []).map((p, i) => ({
+                        key: 'p' + i,
+                        ordre: p.ORDRE || i + 1,
+                        label: p.CODE || p.NOM || 'PLAN' + (i + 1)
+                    }));
+                } catch (err) {
+                    console.error('[liste-vue] loadLookups', err);
+                    if (typeof showErrorToast === 'function') showErrorToast(err.message);
+                }
+            }
+
+            async function loadMarches() {
+                try {
+                    const url = API.BASE + API.HANDLERS_PATH + API.MARCHES;
+                    const resp = await fetch(url);
+                    if (!resp.ok) throw new Error('HTTP ' + resp.status + ' lors du chargement des marchés.');
+                    const data = await resp.json();
+                    if (!data.success) throw new Error(data.message || 'Impossible de charger les marchés.');
+                    marches.value = data.marches || [];
+                } catch (err) {
+                    console.error('[liste-vue] loadMarches', err);
+                    if (typeof showErrorToast === 'function') showErrorToast(err.message);
+                }
             }
 
             // ── Chargement des écritures ──
@@ -55,7 +73,7 @@
                         numeroPiece:    vm.numeroPiece   || '',
                         compte:         vm.compte        || '',
                         tiers:          vm.tiers         || '',
-                        marche:         vm.marche        || '',
+                        marche:         vm.marcheId      || '',
                         page:           vm.page,
                         pageSize:       vm.pageSize
                     });
@@ -76,7 +94,7 @@
                     const data = JSON.parse(text);
                     if (!data.success) throw new Error(data.message || 'Erreur serveur');
                     vm.ecritures = data.ecritures || [];
-                    vm.total     = data.total || vm.ecritures.length;
+                    vm.total     = Number(data.total || 0);
                 } catch (err) {
                     vm.error = err.message;
                     console.error('[liste-vue] ❌', err);
@@ -95,7 +113,7 @@
                     search: '', journalId: '', statut: '',
                     exerciceId: '', dateDebut: '', dateFin: '',
                     datePieceDebut: '', datePieceFin: '',
-                    numeroPiece: '', compte: '', tiers: '', marche: '',
+                    numeroPiece: '', compte: '', tiers: '', marcheId: '',
                     page: 1
                 });
                 loadEcritures();
@@ -110,13 +128,16 @@
                 vm.expanded[id] = true;
                 if (!vm.linesCache[id]) {
                     try {
-                        const url = API.BASE + API.HANDLERS_PATH + API.ECRITURES_DETAIL + '?id=' + encodeURIComponent(id);
+                        const url = API.BASE + API.HANDLERS_PATH + API.DETAIL + '?id=' + encodeURIComponent(id);
                         const resp = await fetch(url);
+                        if (!resp.ok) throw new Error('HTTP ' + resp.status + ' lors du chargement des lignes.');
                         const data = await resp.json();
+                        if (!data.success) throw new Error(data.message || 'Impossible de charger les lignes.');
                         vm.linesCache[id] = data.lignes || [];
                     } catch (err) {
                         console.error('[liste-vue] toggleLines', err);
-                        vm.linesCache[id] = [];
+                        vm.expanded[id] = false;
+                        if (typeof showErrorToast === 'function') showErrorToast(err.message);
                     }
                 }
             }
@@ -138,7 +159,24 @@
             const totalPages = computed(() => Math.max(1, Math.ceil(vm.total / vm.pageSize)));
             const pagination = computed(() => {
                 const pages = [];
-                for (let i = 1; i <= totalPages.value; i++) pages.push({ page: i, text: i, disabled: i === vm.page });
+                const total = totalPages.value;
+                const current = vm.page;
+                if (total <= 7) {
+                    for (let i = 1; i <= total; i++) {
+                        pages.push({ page: i, text: i, disabled: i === current });
+                    }
+                    return pages;
+                }
+
+                pages.push({ page: 1, text: 1, disabled: current === 1 });
+                const start = Math.max(2, current - 2);
+                const end = Math.min(total - 1, current + 2);
+                if (start > 2) pages.push({ page: null, text: '…', disabled: true });
+                for (let i = start; i <= end; i++) {
+                    pages.push({ page: i, text: i, disabled: i === current });
+                }
+                if (end < total - 1) pages.push({ page: null, text: '…', disabled: true });
+                pages.push({ page: total, text: total, disabled: current === total });
                 return pages;
             });
             const counterText = computed(() => `${vm.total} ${t('liste_ecritures.count_unit')}`);
@@ -146,10 +184,13 @@
                 ? 'background:#007bff;color:#fff;border:1px solid #007bff;padding:5px 10px;border-radius:4px;'
                 : 'background:#fff;color:#007bff;border:1px solid #007bff;padding:5px 10px;border-radius:4px;cursor:pointer;';
 
-            onMounted(async () => { await loadLookups(); await loadEcritures(); });
+            onMounted(async () => {
+                await Promise.all([loadLookups(), loadMarches()]);
+                await loadEcritures();
+            });
 
             return {
-                vm, exercices, journaux, activePlans,
+                vm, exercices, journaux, marches, activePlans,
                 onSearchInput, onFilterChange, resetFilters,
                 editEcr, navigateToNew, toggleLines, goToPage,
                 fmt, resolveCode, statusClass, statusLabel, t,

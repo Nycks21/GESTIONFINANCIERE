@@ -39,19 +39,23 @@ public class GetSaisieLookups : IHttpHandler, IRequiresSessionState
                 conn.Open();
 
                 // ─── Sites actifs (Centre de saisie) ───
+                // ⭐ EN_COURS est transmis pour que le front-end puisse pré-sélectionner
+                //    le site marqué "en cours" comme site par défaut dans les saisies.
+                //    ORDER BY EN_COURS DESC → le site "en cours" remonte en tête.
                 using (SqlCommand cmd = new SqlCommand(@"
-                    SELECT ID, CODE, NOM
+                    SELECT ID, CODE, NOM, EN_COURS
                     FROM FSITE
                     WHERE ACTIVE = 1 AND DELETION_AT IS NULL
-                    ORDER BY CODE", conn))
+                    ORDER BY EN_COURS DESC, CODE", conn))
                 using (SqlDataReader r = cmd.ExecuteReader())
                 {
                     while (r.Read())
                     {
                         var d = new Dictionary<string, object>();
-                        d["ID"]   = r["ID"].ToString();
-                        d["CODE"] = r["CODE"].ToString();
-                        d["NOM"]  = r["NOM"].ToString();
+                        d["ID"]       = r["ID"].ToString();
+                        d["CODE"]     = r["CODE"].ToString();
+                        d["NOM"]      = r["NOM"].ToString();
+                        d["EN_COURS"] = Convert.ToBoolean(r["EN_COURS"]);   // ⭐ AJOUT
                         sites.Add(d);
                     }
                 }

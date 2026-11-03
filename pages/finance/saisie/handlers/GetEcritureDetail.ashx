@@ -75,9 +75,13 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                 { ctx.Response.Write("{\"success\":false,\"message\":\"Écriture introuvable.\"}"); return; }
 
                 // ─── LIGNES FECRITURE_LIGNE ───
+                // ⭐ AJOUT : CATEGORIE_JOURNAL — historisation de la catégorie
+                //    du journal au moment de la saisie (1 = OD, 2 = TRESORERIE)
                 using (SqlCommand cmd = new SqlCommand(@"
                     SELECT ID, ORDRE, COMPTE_ID, COMPTE_PLAN_ORDER, TIERS_ID, AUXILIAIRE,
+                           CATEGORIE_JOURNAL,
                            LIBELLE, SENS, MONTANT, MONTANT_DEVISE, COURS_DEVISE,
+                           DATE_ECHEANCE, MODE_REGULARISATION,
                            OPERATION_PUBLIQUE_ID, OP_PLAN_ORDER,
                            PLAN1, PLAN2, PLAN3, PLAN4, PLAN5,
                            PLAN6, PLAN7, PLAN8, PLAN9, PLAN10,
@@ -98,6 +102,13 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
                             l["COMPTE_PLAN_ORDER"]     = r["COMPTE_PLAN_ORDER"] == DBNull.Value ? (object)null : Convert.ToInt32(r["COMPTE_PLAN_ORDER"]);
                             l["TIERS_ID"]              = r["TIERS_ID"] == DBNull.Value ? null : r["TIERS_ID"].ToString();
                             l["AUXILIAIRE"]            = r["AUXILIAIRE"] == DBNull.Value ? "" : r["AUXILIAIRE"].ToString();
+
+                            // ⭐ AJOUT — catégorie historisée (1 = OD, 2 = TRESORERIE)
+                            //    Valeur 1 par défaut si NULL (anciennes lignes non backfillées)
+                            l["CATEGORIE_JOURNAL"] = r["CATEGORIE_JOURNAL"] == DBNull.Value
+                                ? 1
+                                : Convert.ToInt32(r["CATEGORIE_JOURNAL"]);
+
                             l["LIBELLE"]               = r["LIBELLE"] == DBNull.Value ? "" : r["LIBELLE"].ToString();
 
                             string sens = r["SENS"] == DBNull.Value ? null : r["SENS"].ToString();
@@ -111,6 +122,8 @@ public class GetEcritureDetail : IHttpHandler, IRequiresSessionState
 
                             l["MONTANT_DEVISE"]        = r["MONTANT_DEVISE"] == DBNull.Value ? (object)null : Convert.ToDecimal(r["MONTANT_DEVISE"]);
                             l["COURS_DEVISE"]          = r["COURS_DEVISE"]   == DBNull.Value ? (object)null : Convert.ToDecimal(r["COURS_DEVISE"]);
+                            l["DATE_ECHEANCE"]         = r["DATE_ECHEANCE"] == DBNull.Value ? "" : Convert.ToDateTime(r["DATE_ECHEANCE"]).ToString("yyyy-MM-dd");
+                            l["MODE_REGULARISATION"]   = r["MODE_REGULARISATION"] == DBNull.Value ? "" : r["MODE_REGULARISATION"].ToString();
                             l["OPERATION_PUBLIQUE_ID"] = r["OPERATION_PUBLIQUE_ID"] == DBNull.Value ? null : r["OPERATION_PUBLIQUE_ID"].ToString();
                             l["OP_PLAN_ORDER"]         = r["OP_PLAN_ORDER"] == DBNull.Value ? (object)null : Convert.ToInt32(r["OP_PLAN_ORDER"]);
                             l["PLAN1"]                 = r["PLAN1"]  == DBNull.Value ? null : r["PLAN1"].ToString();

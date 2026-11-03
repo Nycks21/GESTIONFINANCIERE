@@ -117,14 +117,22 @@ function validateEcriture() {
     var journal  = _getVal('ecrJournal');
     var exercice = _getVal('ecrExercice');
     var devise   = _getVal('ecrDevise');
+    var cours    = parseMoneyFR(_getVal('ecrCours'));
 
     if (!date)     errors.push(_t('saisie.msg.date_required')     || 'La date comptable est obligatoire.');
     if (!journal)  errors.push(_t('saisie.msg.journal_required')  || 'Le journal est obligatoire.');
     if (!exercice) errors.push(_t('saisie.msg.exercice_required') || 'L\'exercice est obligatoire.');
     if (!devise)   errors.push(_t('saisie.msg.devise_required')   || 'La devise est obligatoire.');
+    if (!cours || cours <= 0) errors.push(_t('saisie.msg.exchange_rate_required') || 'Le cours de devise doit être supérieur à zéro.');
 
     if (date && exercice && !findPeriodeId(date)) {
         errors.push(_t('saisie.msg.no_period') || 'Aucune période ouverte ne correspond à cette date.');
+    }
+    if (date && exercice) {
+        var ex = (AppState.exercices || []).find(function (x) { return x.ID === exercice; });
+        if (ex && (date < ex.DATE_DEBUT || date > ex.DATE_FIN)) {
+            errors.push(_t('saisie.msg.date_outside_exercice') || 'La date comptable doit appartenir à l\'exercice sélectionné.');
+        }
     }
 
     if (!AppState.lignes.length) {

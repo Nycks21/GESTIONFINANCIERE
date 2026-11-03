@@ -1,5 +1,7 @@
 // crud.js — SAISIE (actions CRUD) avec plans dynamiques + équilibre double + dirty tracking
 // ⭐ Mise à jour : gestion du champ MARCHE (ecrMarche)
+// ⭐ Mise à jour : badge CATEGORIE_JOURNAL + restriction PLAN1 (journal trésorerie)
+// ⭐ Mise à jour : rechargement complet de la page après enregistrement + routage SAVE/EDIT
 'use strict';
 function _t(k, p) { return (typeof window.t === 'function') ? window.t(k, p) : k; }
 
@@ -45,7 +47,6 @@ window.addEventListener('beforeunload', function (e) {
 // ============================================================
 // CONVERSIONS LIGNE
 // ============================================================
-
 function _serverLigneToClient(l) {
     var ordreToKey = buildOrdreToKeyMap();
 
@@ -62,14 +63,19 @@ function _serverLigneToClient(l) {
 
     var out = {
         auxiliaire:   l.AUXILIAIRE || '',
-        compteIdSUB:  null,
-        mode:         l.SOURCE_FINANCEMENT || '',
+        tiersId:      l.TIERS_ID || null,
+        compteIdSUB:  l.SOURCE_FINANCEMENT || '',
+        sourceFinancement: l.SOURCE_FINANCEMENT || '',
+        mode:         l.MODE_REGULARISATION || '',
         libelle:      l.LIBELLE || '',
         montantRep:   parseFloat(l.MONTANT_DEVISE || 0) || 0,
+        coursDevise:  parseFloat(l.COURS_DEVISE || 0) || 0,
         sens:         debit > 0 ? 'D' : 'C',
         debit:        debit,
         credit:       credit,
-        echeance:     l.DATE_ECHEANCE || ''
+        echeance:     l.DATE_ECHEANCE || '',
+        // ⭐ Récupération de la catégorie historisée
+        categorieJournal: (l.CATEGORIE_JOURNAL === 1 || l.CATEGORIE_JOURNAL === 2) ? l.CATEGORIE_JOURNAL : null
     };
 
     for (var k = 1; k <= 10; k++) {
@@ -85,16 +91,29 @@ function _clientLigneToPayload(l) {
     var keyToOrdre = buildKeyToOrdreMap();
     var primaire = getPrimaryPlanField();
 
+    // ⭐ Détermination de la catégorie (soit présente sur la ligne, soit via le journal)
+    var cat = l.categorieJournal;
+    if (cat !== 1 && cat !== 2) {
+        if (typeof _resolveCategorieJournal === 'function') {
+            cat = _resolveCategorieJournal(_getVal('ecrJournal'));
+        }
+    }
+    if (cat !== 1 && cat !== 2) cat = 1;
+
     var out = {
         compteId:          primaire ? (l['compteId' + primaire.key] || null) : null,
         comptePlanOrder:   primaire ? primaire.ordre : null,
         tiersId:           l.tiersId || null,
         auxiliaire:        l.auxiliaire || null,
         libelle:           l.libelle || null,
+        dateEcheance:      l.echeance || null,
         debit:             l.debit || 0,
         credit:            l.credit || 0,
         montantDevise:     l.montantRep || 0,
-        sourceFinancement: l.mode || null
+        coursDevise:       parseMoneyFR(_getVal('ecrCours')),
+        modeRegularisation: l.mode || null,
+        sourceFinancement: l.sourceFinancement || l.compteIdSUB || null,
+        categorieJournal:  cat // ⭐ Envoi au serveur
     };
 
     for (var k = 1; k <= 10; k++) {
@@ -124,20 +143,17 @@ function _getDefaultSiteId() {
 }
 
 // ============================================================
-// ⭐ HELPER — SÉLECTION DU MARCHÉ (avec fallback orphelin)
+// HELPER — SÉLECTION DU MARCHÉ
 // ============================================================
 function _applyMarcheToSelect(marcheId) {
     var mrcSel = document.getElementById('ecrMarche');
     if (!mrcSel) return;
 
-    // Reset à vide par défaut
     mrcSel.value = '';
     if (!marcheId) return;
 
-    // Tentative de sélection dans les options existantes
     mrcSel.value = marcheId;
 
-    // Si la valeur n'existe pas dans la liste → option dynamique
     if (mrcSel.value !== marcheId) {
         var opt = document.createElement('option');
         opt.value = marcheId;
@@ -150,16 +166,35 @@ function _applyMarcheToSelect(marcheId) {
 }
 
 // ============================================================
+// HELPERS DE RAFRAÎCHISSEMENT
+// ============================================================
+function _refreshCategorieBadgeSafe() {
+    if (typeof _refreshCategorieJournalDisplay === 'function') {
+        try { _refreshCategorieJournalDisplay(); } catch (e) { /* ignore */ }
+    }
+}
+
+function _refreshPlanRestrictionSafe() {
+    if (typeof refreshPlanRestrictionUI === 'function') {
+        try { refreshPlanRestrictionUI(); } catch (e) { /* ignore */ }
+    }
+}
+
+// ============================================================
 // NOUVELLE ÉCRITURE
 // ============================================================
 function newEcriture() {
     AppState.editingId = null;
     AppState.lignes = [];
     AppState.selectedLigneIndex = -1;
+    AppState.lettrageSources = [];
 
     _setVal('editingId', '');
     _setVal('ecrNumero', '');
-    _setVal('ecrDate', new Date().toISOString().slice(0, 10));
+    var now = new Date();
+    var localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
+        .toISOString().slice(0, 10);
+    _setVal('ecrDate', localToday);
     _setVal('ecrDatePiece', '');
     _setVal('ecrReference', '');
     _setVal('ecrReferenceFacture', '');
@@ -168,7 +203,6 @@ function newEcriture() {
     _setVal('ecrStatut', 'BROUILLON');
     _setVal('ecrCours', '1');
 
-    // ⭐ NOUVEAU : reset du marché
     var mrcSel = document.getElementById('ecrMarche');
     if (mrcSel) mrcSel.value = '';
 
@@ -177,10 +211,12 @@ function newEcriture() {
 
     _setVal('ecrPeriode', findPeriodeId(_getVal('ecrDate')));
 
-    if (AppState.exercices.length === 1) {
+    if (AppState.exercices && AppState.exercices.length === 1) {
         _setVal('ecrExercice', AppState.exercices[0].ID);
         loadPeriodes(AppState.exercices[0].ID).then(function () {
             _setVal('ecrPeriode', findPeriodeId(_getVal('ecrDate')));
+        }).catch(function (err) {
+            showErrorToast(err.message);
         });
     }
 
@@ -190,6 +226,9 @@ function newEcriture() {
     switchTab('edit');
 
     if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
+
+    _refreshCategorieBadgeSafe();
+    _refreshPlanRestrictionSafe();
 
     markClean();
 }
@@ -239,6 +278,7 @@ async function editEcriture(id) {
         _setVal('ecrJournal', ecr.JOURNAL_ID);
         _setVal('ecrExercice', ecr.EXERCICE_ID);
         _setVal('ecrDevise', ecr.MONNAIE_ID);
+        _setVal('ecrCours', '1');
         _setVal('ecrNumero', ecr.NUMERO);
         _setVal('ecrDate', ecr.DATE_COMPTABLE);
         _setVal('ecrDatePiece', ecr.DATE_PIECE || '');
@@ -248,13 +288,14 @@ async function editEcriture(id) {
         _setVal('ecrLibelle', ecr.LIBELLE);
         _setVal('ecrStatut', ecr.STATUT);
 
-        // ⭐ NOUVEAU : sélection du marché (avec gestion orphelin)
         _applyMarcheToSelect(ecr.MARCHE);
 
         await loadPeriodes(ecr.EXERCICE_ID);
         _setVal('ecrPeriode', ecr.PERIODE_ID || findPeriodeId(ecr.DATE_COMPTABLE));
-
-        await loadAllComptesActifs();
+        var firstCourseLine = (data.lignes || []).find(function (line) {
+            return line.COURS_DEVISE !== null && line.COURS_DEVISE !== undefined;
+        });
+        if (firstCourseLine) _setVal('ecrCours', firstCourseLine.COURS_DEVISE);
 
         data.lignes.forEach(function (l) {
             var client = _serverLigneToClient(l);
@@ -276,6 +317,9 @@ async function editEcriture(id) {
 
         switchTab('edit');
 
+        _refreshCategorieBadgeSafe();
+        _refreshPlanRestrictionSafe();
+
         markClean();
     } catch (err) {
         showErrorToast(err.message);
@@ -285,7 +329,7 @@ async function editEcriture(id) {
 }
 
 // ============================================================
-// SAUVEGARDER L'ÉCRITURE
+// SAUVEGARDER L'ÉCRITURE (CREATE ou UPDATE)
 // ============================================================
 async function saveEcriture(e) {
     if (e) e.preventDefault();
@@ -340,7 +384,6 @@ async function saveEcriture(e) {
 
     var siteId = _getVal('ecrSite') || _getDefaultSiteId() || null;
 
-    // ⭐ Payload avec MARCHE
     var payload = {
         id:               AppState.editingId,
         siteId:           siteId,
@@ -348,6 +391,7 @@ async function saveEcriture(e) {
         periodeId:        periodeId,
         journalId:        _getVal('ecrJournal'),
         monnaieId:        _getVal('ecrDevise'),
+        coursDevise:      parseMoneyFR(_getVal('ecrCours')),
         numero:           numeroFinal,
         dateComptable:    _getVal('ecrDate'),
         datePiece:        _getVal('ecrDatePiece'),
@@ -356,16 +400,20 @@ async function saveEcriture(e) {
         dateFacture:      _getVal('ecrDateFacture') || null,
         libelle:          libelleFinal,
         statut:           _getVal('ecrStatut'),
-        // ⭐ NOUVEAU : ID du marché (GUID) ou null
         marche:           _getVal('ecrMarche') || null,
-        lignes:           lignesPayload
+        lignes:           lignesPayload,
+        lettrageSources:  AppState.lettrageSources || []
     };
 
     if (btnSave) btnSave.disabled = true;
 
     try {
         showSpinner();
-        var url = API.BASE + API.HANDLERS_PATH + API.SAVE;
+
+        // ⭐ Routage dynamique SAVE vs EDIT
+        var endpoint = AppState.editingId ? API.EDIT : API.SAVE;
+        var url = API.BASE + API.HANDLERS_PATH + endpoint;
+
         var resp = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -374,18 +422,23 @@ async function saveEcriture(e) {
         var result = await resp.json();
 
         if (result.success) {
-            showSuccessToast(result.message || _t('saisie.msg.save_ok') || 'Écriture enregistrée');
+            showSuccessToast(result.message || (AppState.editingId ? 'Écriture modifiée' : 'Écriture enregistrée'));
 
+            // ⭐ Marquer clean AVANT le reload pour désactiver beforeunload
             markClean();
 
-            newEcriture();
-            loadEcritures();
-            switchTab('list');
+            // ⭐ Rechargement complet de la page après 800 ms
+            setTimeout(function () {
+                window.location.reload();
+            }, 800);
+            return;
         } else {
             showErrorToast(result.message || _t('message.error') || 'Erreur');
+            if (btnSave) btnSave.disabled = false;
         }
     } catch (err) {
         showErrorToast(err.message);
+        if (btnSave) btnSave.disabled = false;
     } finally {
         hideSpinner();
         if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
@@ -438,7 +491,6 @@ async function deleteEcriture(id) {
             AppState.editingId = null;
             AppState.lignes = [];
             newEcriture();
-            loadEcritures();
         } else {
             showErrorToast(result.message || _t('message.error') || 'Erreur');
         }
@@ -474,11 +526,10 @@ window.deleteEcriture        = deleteEcriture;
 window.deleteCurrentEcriture = deleteCurrentEcriture;
 window.loadNextNumero        = loadNextNumero;
 window._getDefaultSiteId     = _getDefaultSiteId;
-window._applyMarcheToSelect  = _applyMarcheToSelect;   // ⭐ utilitaire public
+window._applyMarcheToSelect  = _applyMarcheToSelect;
 window._serverLigneToClient  = _serverLigneToClient;
 window._clientLigneToPayload = _clientLigneToPayload;
 
-// ⭐ Dirty tracking
 window.markDirty            = markDirty;
 window.markClean            = markClean;
 window.hasUnsavedChanges    = hasUnsavedChanges;

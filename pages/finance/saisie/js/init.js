@@ -18,17 +18,18 @@ $(document).ready(function () {
 
     // ============================================================
     // 1) CHARGEMENT INITIAL
-    //    - loadLookups → référentiels + plans
-    //    - loadAllComptesActifs → comptes des plans
-    //    - loadEcritures → liste (bridge Vue si présent)
+    //    - loadLookups → référentiels + comptes des plans
+    //    - editEcriture → écriture demandée, sinon nouvelle écriture
     // ============================================================
     loadLookups()
         .then(function () {
-            return loadAllComptesActifs();
-        })
-        .then(function () {
             bindDynamicPlanListeners();
-            loadEcritures();
+            var query = new URLSearchParams(window.location.search);
+            var editId = query.get('editId') || query.get('id');
+            if (editId) {
+                return editEcriture(editId);
+            }
+            newEcriture();
         })
         .catch(function (err) {
             console.error('[init] Erreur chargement initial :', err);
@@ -38,29 +39,10 @@ $(document).ready(function () {
             );
         });
 
-    // ============================================================
-    // 2) FILTRES LISTE
-    //    ⭐ Uniquement si Vue n'est PAS chargé.
-    //       Sinon, Vue gère ses propres filtres via v-model.
-    // ============================================================
-    if (!window._VueSaisieList) {
-        var tid = null;
-        $(document).on('input', '#search-filter', function () {
-            clearTimeout(tid);
-            tid = setTimeout(function () {
-                AppState.filters.search = _getVal('search-filter');
-                AppState.page = 1;
-                loadEcritures({ silent: true });
-            }, 300);
-        });
-
-        $(document).on('change', '#journal-filter, #statut-filter', function () {
-            AppState.filters.journalId = _getVal('journal-filter');
-            AppState.filters.statut    = _getVal('statut-filter');
-            AppState.page = 1;
-            loadEcritures({ silent: true });
-        });
-    }
+    // La liste est gérée sur liste-ecritures.aspx, pas sur le formulaire de saisie.
+    $(document).on('input change', '#tab-edit input, #tab-edit select, #tab-edit textarea', function () {
+        if (typeof markDirty === 'function') markDirty();
+    });
 
     // ============================================================
     // 3) ENTÊTE — Journal → numéro auto
@@ -77,6 +59,8 @@ $(document).ready(function () {
         loadPeriodes(exId).then(function () {
             var d = _getVal('ecrDate');
             if (d) _setVal('ecrPeriode', findPeriodeId(d));
+        }).catch(function (err) {
+            showErrorToast(err.message);
         });
     });
 
@@ -98,30 +82,6 @@ $(document).ready(function () {
         if (m && m.EST_REFERENCE) _setVal('ecrCours', '1');
     });
 
-    // ============================================================
-    // 7) RESET FILTRES (fallback vanilla)
-    // ============================================================
-    window.resetFilters = function () {
-        if (window._VueSaisieList && typeof window._VueSaisieList.resetFilters === 'function') {
-            window._VueSaisieList.resetFilters();
-            return;
-        }
-        _setVal('search-filter', '');
-        _setVal('journal-filter', '');
-        _setVal('statut-filter', '');
-        AppState.filters = { search: '', journalId: '', statut: '' };
-        AppState.page = 1;
-        loadEcritures({ silent: true });
-    };
-
-    // ============================================================
-    // 8) RAFRAÎCHIT LE BOUTON ENREGISTRER au démarrage
-    // ============================================================
-    setTimeout(function () {
-        if (typeof updateSaveButtonState === 'function') {
-            updateSaveButtonState();
-        }
-    }, 500);
 });
 
 // ============================================================

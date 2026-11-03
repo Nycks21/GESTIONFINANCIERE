@@ -32,7 +32,7 @@ public static class AuthHelper
   // ============================================================
   // CONSTANTES ET CHAMPS PRIVÉS
   // ============================================================
-  private static readonly string connStr;
+  private static string connStr { get { return DatabaseConnectionHelper.ConnectionString; } }
   private const string SK_AUTHENTICATED = "authenticated";
   private const string SK_USERNAME = "username";
   private const string SK_IDUSER = "IDUSER";
@@ -41,18 +41,6 @@ public static class AuthHelper
   private const string SK_USER_PERMISSIONS = "USER_PERMISSIONS";
   private const string SK_CSRF_TOKEN = "CSRF_TOKEN";
   private const string CSRF_HEADER_NAME = "X-CSRF-Token";
-
-  static AuthHelper()
-  {
-    try
-    {
-      var connSetting = ConfigurationManager.ConnectionStrings["MaConnexion"];
-      connStr = connSetting != null && connSetting.ConnectionString != null
-          ? connSetting.ConnectionString
-          : "";
-    }
-    catch { connStr = ""; }
-  }
 
   public static string ConnectionString { get { return connStr; } }
 

@@ -18,6 +18,7 @@ const AppState = {
     exercices: [],
     monnaies: [],
     periodes: [],
+    periodesExerciceId: '',
     marchesLookup:      [],
     modes: [],         // modes de régularisation (depuis FPARAMETRE)
     plansActifs: [],
@@ -29,7 +30,8 @@ const AppState = {
     selectedLigneIndex: -1,
 
     // Pour undo
-    lastLigneSnapshot: null
+    lastLigneSnapshot: null,
+    lettrageSources: []
 };
 
 window.AppState = AppState;

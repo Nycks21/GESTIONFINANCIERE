@@ -38,10 +38,13 @@ public class GetComptesByPlan : IHttpHandler, IRequiresSessionState
             string connStr = AuthHelper.ConnectionString;
             var comptes = new List<Dictionary<string, object>>();
 
-            // ✅ Requête corrigée : on récupère les comptes FEUILLES
+            // ⭐ Requête corrigée : on récupère les comptes FEUILLES
             //    (pas d'enfants actifs) → ce sont ceux saisissables
+            //    + RESTREINDRE_IMPUT_TRESO pour la règle de restriction en saisie
             string sql = @"
-                SELECT p.ID, p.CODE, p.LIBELLE, p.NIVEAU, p.TYPE_ELEMENT, p.EST_AUXILIAIRE
+                SELECT p.ID, p.CODE, p.LIBELLE, p.NIVEAU, p.TYPE_ELEMENT,
+                       p.EST_AUXILIAIRE,
+                       p.RESTREINDRE_IMPUT_TRESO      -- ⭐ AJOUT
                   FROM " + tableName + @" p
                  WHERE p.ACTIVE = 1
                    AND p.DELETION_AT IS NULL
@@ -73,6 +76,14 @@ public class GetComptesByPlan : IHttpHandler, IRequiresSessionState
                         d["TYPE_ELEMENT"]   = r["TYPE_ELEMENT"].ToString();
                         d["EST_AUXILIAIRE"] = Convert.ToBoolean(r["EST_AUXILIAIRE"]);
                         d["PLAN_ORDER"]     = ordre;
+
+                        // ⭐ AJOUT — sans cette clé, condition3_flag = false
+                        //    côté JS, et le grisage des PLAN2..PLAN10 ne s'active jamais
+                        d["RESTREINDRE_IMPUT_TRESO"] =
+                            r["RESTREINDRE_IMPUT_TRESO"] == DBNull.Value
+                                ? 0
+                                : Convert.ToInt32(r["RESTREINDRE_IMPUT_TRESO"]);
+
                         comptes.Add(d);
                     }
                 }

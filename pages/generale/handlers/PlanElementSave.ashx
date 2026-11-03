@@ -38,13 +38,19 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
             string parentId      = GetString(data, "parentId");
             bool   actif         = GetBool(data, "active", true);
             bool   estAuxiliaire = GetBool(data, "estAuxiliaire", false);
+            bool   restreindreTreso = GetBool(data, "restreindreImputTreso", false);
+
+            // Spec §3 : la restriction ne s'applique qu'aux comptes "4…".
+            // Garde-fou serveur — l'UI n'est jamais la seule source de vérité.
+            if (!code.StartsWith("4", StringComparison.Ordinal))
+                restreindreTreso = false;
 
             if (string.IsNullOrEmpty(code))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Le code est obligatoire.\"}"); return; }
             if (string.IsNullOrEmpty(libelle))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Le libellé est obligatoire.\"}"); return; }
 
-            // ✅ C# 4.0 : variable nommée au lieu du discard `out _`
+            // C# 4.0 : variable nommée au lieu du discard `out _`
             Guid tmpGuid;
             bool isEdit = !string.IsNullOrEmpty(id) && Guid.TryParse(id, out tmpGuid);
 
@@ -157,6 +163,7 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
                                     NIVEAU = @niv,
                                     ACTIVE = @act,
                                     EST_AUXILIAIRE = @aux,
+                                    RESTREINDRE_IMPUT_TRESO = @rt,
                                     UPDATED_BY = @uid,
                                     UPDATED_AT = GETDATE()
                                 WHERE ID = @id AND DELETION_AT IS NULL";
@@ -169,6 +176,7 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@niv", niveau);
                                 cmd.Parameters.AddWithValue("@act", actif ? 1 : 0);
                                 cmd.Parameters.AddWithValue("@aux", estAuxiliaire ? 1 : 0);
+                                cmd.Parameters.AddWithValue("@rt", restreindreTreso ? 1 : 0);
                                 cmd.Parameters.AddWithValue("@uid", userId);
                                 cmd.ExecuteNonQuery();
                             }
@@ -179,10 +187,11 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
                                 INSERT INTO " + tableName + @"
                                     (ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE,
                                      TYPE_ELEMENT, ACTIVE, EST_AUXILIAIRE,
+                                     RESTREINDRE_IMPUT_TRESO,
                                      CREATED_BY, CREATED_AT)
                                 VALUES
                                     (@id, @code, @lib, @parent, @niv, @ordre,
-                                     'DETAIL', @act, @aux, @uid, GETDATE())";
+                                     'DETAIL', @act, @aux, @rt, @uid, GETDATE())";
                             using (var cmd = new SqlCommand(sqlInsert, conn, tx))
                             {
                                 cmd.Parameters.AddWithValue("@id", finalId);
@@ -193,6 +202,7 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
                                 cmd.Parameters.AddWithValue("@ordre", ordreElement);
                                 cmd.Parameters.AddWithValue("@act", actif ? 1 : 0);
                                 cmd.Parameters.AddWithValue("@aux", estAuxiliaire ? 1 : 0);
+                                cmd.Parameters.AddWithValue("@rt", restreindreTreso ? 1 : 0);
                                 cmd.Parameters.AddWithValue("@uid", userId);
                                 cmd.ExecuteNonQuery();
                             }
@@ -229,7 +239,9 @@ public class PlanElementSave : IHttpHandler, IRequiresSessionState
                     {
                         cmdLog.Parameters.AddWithValue("@uid", userId);
                         cmdLog.Parameters.AddWithValue("@act", isEdit ? "ELEMENT_EDIT" : "ELEMENT_ADD");
-                        cmdLog.Parameters.AddWithValue("@det", "PLAN" + ordre + " / " + code + " - " + libelle);
+                        cmdLog.Parameters.AddWithValue("@det",
+                            "PLAN" + ordre + " / " + code + " - " + libelle
+                            + (restreindreTreso ? " [restriction trésorerie]" : ""));
                         cmdLog.Parameters.AddWithValue("@ip", ip);
                         cmdLog.ExecuteNonQuery();
                     }

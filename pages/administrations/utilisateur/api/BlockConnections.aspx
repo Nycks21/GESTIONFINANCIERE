@@ -47,7 +47,7 @@ protected void Page_Load(object sender, EventArgs e)
         if (duration > 1440) duration = 1440;
 
         DateTime blockUntil = DateTime.Now.AddMinutes(duration);
-        string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+        string connStr = AuthHelper.ConnectionString;
 
         using (SqlConnection conn = new SqlConnection(connStr))
         {

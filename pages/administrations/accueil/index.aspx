@@ -41,6 +41,7 @@
             </div>
 
             <section class="content admin-accueil-content">
+              
 
                 <!-- ═══════════════ Section présentation ═══════════════ -->
                 <div class="admin-hero">

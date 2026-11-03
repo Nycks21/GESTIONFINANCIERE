@@ -22,7 +22,7 @@ protected void Page_Load(object sender, EventArgs e)
             // Les SuperAdmin ne sont jamais bloqués
             if (userRole != 0)
             {
-                string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+                string connStr = AuthHelper.ConnectionString;
                 using (SqlConnection conn = new SqlConnection(connStr))
                 {
                     conn.Open();

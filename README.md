@@ -103,3 +103,28 @@ AdminLTE.io reserves the right to change the license of future releases.
 - [Pickaface](https://pickaface.net/)
 - [Unsplash](https://unsplash.com/)
 - [Uifaces](http://uifaces.com/)
+
+## Configuration SQL Server (IIS)
+
+La page `ConfigurationBDD.aspx` est réservée à l’administration. Lorsque la connexion
+SQL Server est indisponible, l’activation initiale est possible uniquement depuis la
+machine IIS avec le jeton `GESTIONFINANCIERE_DB_SETUP_TOKEN`, défini dans
+l’environnement du processus IIS (ne pas le placer dans le dépôt ni dans `web.config`).
+Utilisez un jeton aléatoire fort, protégez son stockage et recyclez le pool après l’avoir
+défini. L’activation refuse les requêtes locales relayées avec `Forwarded` ou
+`X-Forwarded-For` ; derrière un proxy, ouvrez la page directement sur IIS. Une fois
+la base opérationnelle, l’accès à la configuration exige un compte
+administrateur de l’application.
+
+Le pool IIS doit pouvoir écrire dans `web.config` pour enregistrer la configuration
+et dans `App_Data` pour journaliser les opérations. Limitez ces droits à l’identité du
+pool concerné. La section `connectionStrings` est chiffrée avec le fournisseur de
+protection de configuration Windows lors de l’enregistrement. La licence `bin/licence.key`
+doit être valide ; la page de configuration ne contourne pas son contrôle.
+
+Pour une nouvelle installation, testez d’abord le serveur et les permissions, puis
+confirmez explicitement la création. L’application refuse toute base déjà existante.
+Le schéma est adapté depuis `update/BDDSQLCONSO.sql` sans exécuter ses instructions
+de suppression/création de base et sans son compte administrateur par défaut ; le
+formulaire crée le premier compte avec un mot de passe haché. Si l’initialisation
+échoue, la base partielle n’est pas enregistrée ni supprimée automatiquement.

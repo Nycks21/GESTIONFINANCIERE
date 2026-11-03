@@ -6,7 +6,7 @@
 <%@ Import Namespace="System.Linq" %>
 
 <script runat="server">
-private string connStr = ConfigurationManager.ConnectionStrings["MaConnexion"].ConnectionString;
+private string connStr = AuthHelper.ConnectionString;
 
 protected void Page_Load(object sender, EventArgs e)
 {

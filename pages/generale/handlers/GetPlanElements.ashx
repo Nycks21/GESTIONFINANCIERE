@@ -79,10 +79,13 @@ public class GetPlanElements : IHttpHandler, IRequiresSessionState
                     return;
                 }
 
-                // Charge les éléments de PLANx (table dynamique validée)
+                // ⚠️ RESTREINDRE_IMPUT_TRESO doit exister sur PLAN1..PLAN10
+                //    (migration requise, cf. résumé final). Si la colonne manque,
+                //    le handler lèvera un SQL Error explicite (invalid column).
                 string sqlEl = @"
                     SELECT ID, CODE, LIBELLE, PARENT_ID, NIVEAU, ORDRE,
                            TYPE_ELEMENT, NATURE, ACTIVE, EST_AUXILIAIRE,
+                           RESTREINDRE_IMPUT_TRESO,
                            CASE WHEN EXISTS (
                                SELECT 1 FROM " + tableName + @" c
                                WHERE c.PARENT_ID = t.ID AND c.DELETION_AT IS NULL
@@ -107,6 +110,8 @@ public class GetPlanElements : IHttpHandler, IRequiresSessionState
                         e["NATURE"]          = r["NATURE"] == DBNull.Value ? "" : r["NATURE"].ToString();
                         e["ACTIVE"]          = Convert.ToBoolean(r["ACTIVE"]);
                         e["EST_AUXILIAIRE"]  = Convert.ToBoolean(r["EST_AUXILIAIRE"]);
+                        // Nouvelle propriété — consommée par crud.js → editElement()
+                        e["RESTREINDRE_IMPUT_TRESO"] = Convert.ToBoolean(r["RESTREINDRE_IMPUT_TRESO"]);
                         e["HAS_CHILDREN"]    = Convert.ToInt32(r["HAS_CHILDREN"]) == 1;
                         elements.Add(e);
                     }
