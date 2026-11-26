@@ -2359,8 +2359,8 @@
   "saisie.diag.motif_treso_lock": "Journal trésorerie — verrouillé sur compte banque",
   "saisie.hint.restrict_4xx_od_short": "Compte tiers 4xxxx sur journal OD : imputations analytiques interdites.",
   "saisie.hint.restrict_4xx_od_banner": "Compte tiers <strong>{code}</strong> sur journal OD : les imputations analytiques sont interdites.",
-  "menu.correction" : "Correction",
-  "menu.grand_livre" : "Grand livre général",
+  "menu.correction": "Correction",
+  "menu.grand_livre": "Grand livre général",
   "correction.open_filters": "Modifier les filtres",
   "correction.refresh": "Actualiser les résultats",
   "correction.count": "{n} écriture(s)",
@@ -2415,5 +2415,12 @@
   "correction.confirm_delete": "Supprimer cette écriture ?",
   "correction.confirm_delete_text": "Cette action est irréversible.",
   "correction.deleted": "Écriture supprimée.",
-  "correction.error": "Erreur"
+  "correction.error": "Erreur",
+  "elements.modal.lettrable_label": "Lettrable",
+  "elements.modal.lettrable_hint": "Cocher si cet élément est lettrable.",
+  "elements.modal.restrict_treso_label": "Restreindre l'imputation trésorerie",
+  "elements.modal.restrict_treso_hint": "Cocher pour restreindre l'imputation à la trésorerie.",
+  "menu.lettrage": "Lettrage",
+  "menu.delletrage": "Déllettrage",
+  "section.traitement": "Traitement"
 }

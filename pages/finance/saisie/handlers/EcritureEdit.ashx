@@ -1,4 +1,4 @@
-<%@ WebHandler Language="C#" Class="EcritureEdit" %>
+﻿<%@ WebHandler Language="C#" Class="EcritureEdit" %>
 using System;
 using System.Collections;
 using System.Collections.Generic;

@@ -2342,7 +2342,7 @@
   "saisie.diag.motif_treso_lock": "Journal trésorerie — mihidy amin'ny kaonty banky",
   "saisie.hint.restrict_4xx_od_short": "Kaonty tiers 4xxxx amin'ny journal OD : voarara ny fametrahana analytique.",
   "saisie.hint.restrict_4xx_od_banner": "Kaonty tiers <strong>{code}</strong> amin'ny journal OD : voarara ny fametrahana analytique.",
-  "menu.correction" : "Fanitsiana",
+  "menu.correction": "Fanitsiana",
   "correction.open_filters": "Ovay ny sivana",
   "correction.refresh": "Havaozy ny valiny",
   "correction.count": "Fanoratana {n}",
@@ -2397,5 +2397,12 @@
   "correction.confirm_delete": "Fafao ity fanoratana ity?",
   "correction.confirm_delete_text": "Tsy azo averina ity hetsika ity.",
   "correction.deleted": "Voafafa ny fanoratana.",
-  "correction.error": "Hadisoana"
+  "correction.error": "Hadisoana",
+  "elements.modal.lettrable_label": "Lettrable (Azo isaina)",
+  "elements.modal.lettrable_hint": "Tsindrio raha azo isaina (lettrable) ity singa ity.",
+  "elements.modal.restrict_treso_label": "Famerana ny fampiasana amin'ny tahirim-bola",
+  "elements.modal.restrict_treso_hint": "Tsindrio mba hametra ny fampiasana amin'ny fitantanam-bola.",
+  "menu.lettrage": "Fampifandraisana",
+  "menu.delletrage": "Fanafoanana",
+  "section.traitement": "Fikarakarana"
 }

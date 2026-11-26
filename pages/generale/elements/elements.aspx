@@ -1,4 +1,4 @@
-﻿<%@ Page Language="C#" AutoEventWireup="true" CodeFile="elements.cs" Inherits="elements" UICulture="Auto" Culture="Auto" %>
+<%@ Page Language="C#" AutoEventWireup="true" CodeFile="elements.cs" Inherits="elements" UICulture="Auto" Culture="Auto" %>
 <!DOCTYPE html>
 <html lang="<%= LocalizationHelper.CurrentCultureCode %>">
 <head>
@@ -178,6 +178,21 @@
                     <input type="text" id="elementNiveau" class="form-control" readonly />
                 </div>
 
+                <!-- ─── Option existante — Lettrable ─── -->
+                <div class="form-group" id="grpLettrable" style="display:none;">
+                    <label style="display:flex; align-items:center; gap:10px; cursor:pointer;">
+                        <input type="checkbox" id="elementLettrable"
+                               style="width:18px;height:18px;accent-color:#2563EB;cursor:pointer;" />
+                        <span style="font-weight:600;">
+                            <i class="fas fa-users" style="color:#2563EB;"></i>
+                            <span data-i18n="elements.modal.lettrable_label">Lettrable</span>
+                        </span>
+                    </label>
+                    <small class="text-muted" style="display:block;margin-top:4px;margin-left:28px;color:#049d5d;font-style: italic;"
+                           data-i18n="elements.modal.lettrable_hint"></small>
+                    <small class="field-error" id="err-elementLettrable"></small>
+                </div>
+
                 <!-- ─── NOUVELLE OPTION — Restreindre les imputations en trésorerie
                      Visible uniquement si CODE commence par "4" (spec §3).
                      Contrôlée par _syncRestrictionTresoVisibilite() dans crud.js. -->
@@ -192,7 +207,7 @@
                             </span>
                         </span>
                     </label>
-                    <small class="text-muted" style="display:block;margin-top:4px;margin-left:28px;"
+                    <small class="text-muted" style="display:block;margin-top:4px;margin-left:28px;color:#049d5d;font-style: italic;"
                            data-i18n="elements.modal.restrict_treso_hint">
                     </small>
                 </div>
@@ -207,11 +222,13 @@
                             <span data-i18n="elements.modal.auxiliaire_label"></span>
                         </span>
                     </label>
-                    <small class="text-muted" style="display:block;margin-top:4px;margin-left:28px;"
+                    <small class="text-muted" style="display:block;margin-top:4px;margin-left:28px;color:#049d5d;font-style: italic;"
                            data-i18n="elements.modal.auxiliaire_hint"></small>
                     <small class="field-error" id="err-elementAuxiliaire"></small>
                 </div>
 
+
+                <!-- ─── Option existante — Actif ─── -->
                 <div class="form-group" style="display:flex; align-items:center; gap:10px;">
                     <input type="checkbox" id="elementActive"
                            style="width:18px;height:18px;cursor:pointer;" checked />

@@ -78,6 +78,61 @@
     margin-left: 30px;
 }
 
+/* ─── Bouton Délettrer — états actif et désactivé ─── */
+.btn-delettrer {
+    background: linear-gradient(135deg, #EF4444, #DC2626);
+    border: none;
+    color: #FFFFFF;
+    font-weight: 700;
+    padding: 10px 20px;
+    border-radius: 8px;
+    transition: all 0.2s ease;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.btn-delettrer:hover:not(:disabled) {
+    background: linear-gradient(135deg, #DC2626, #B91C1C);
+    transform: translateY(-1px);
+}
+
+.btn-delettrer:disabled,
+.btn-delettrer.is-disabled {
+    background: #CBD5E1 !important;
+    color: #94A3B8 !important;
+    cursor: not-allowed !important;
+    box-shadow: none !important;
+    transform: none !important;
+    opacity: 0.7;
+    border: 1px solid #E2E8F0 !important;
+}
+
+.lettrage-warning {
+    position: fixed;
+    bottom: 105px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: #FEF3C7;
+    border: 1px solid #FCD34D;
+    color: #92400E;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 600;
+    box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+    z-index: 999;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    animation: slideUpFloat 0.3s ease-out;
+}
+
+.lettrage-warning i {
+    color: #D97706;
+    font-size: 14px;
+}
+
 /* Animation d'apparition spécifique à la barre flottante */
 @keyframes slideUpFloat {
     from { opacity: 0; transform: translate(-50%, 20px); }
@@ -91,6 +146,17 @@ body.dark-mode .toolbar-account-info {
 body.dark-mode .lettrage-action-bar {
     background: var(--s-card);
     border-color: var(--s-border);
+}
+body.dark-mode .btn-delettrer:disabled,
+body.dark-mode .btn-delettrer.is-disabled {
+    background: #334155 !important;
+    color: #64748B !important;
+    border-color: #475569 !important;
+}
+body.dark-mode .lettrage-warning {
+    background: rgba(245, 158, 11, 0.15);
+    border-color: rgba(245, 158, 11, 0.35);
+    color: #FBBF24;
 }
 
 /* ═══════════════════════════════════════════════════════════

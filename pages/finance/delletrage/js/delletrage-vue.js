@@ -24,6 +24,9 @@
                 showFilterModal: true,
                 hasAppliedFilters: false,
                 selectedLines: [],
+                totalDebitSelected: 0,
+                totalCreditSelected: 0,
+                difference: 0,
                 currentAccountCode: '',
                 currentAccountName: ''
             });
@@ -54,6 +57,34 @@
             const filteredAuxiliaires = computed(() => {
                 if (!filters.compteId) return [];
                 return (lookup.tiers || []).filter(t => t.PLAN_ELEMENT_ID === filters.compteId);
+            });
+
+            const canDelletrage = computed(() => {
+                return vm.selectedLines.length >= 2
+                    && vm.difference <= 0.01
+                    && selectedLinesHaveSameCode.value
+                    && !vm.loading;
+            });
+
+            const selectedLinesHaveSameCode = computed(() => {
+                if (vm.selectedLines.length === 0) return false;
+
+                const selectedLines = vm.lines.filter(l => vm.selectedLines.includes(l.ID));
+                if (selectedLines.length !== vm.selectedLines.length) return false;
+
+                const codes = selectedLines.map(l => String(l.LETTRAGE_CODE || '').trim());
+                return codes[0] !== '' && codes.every(code => code === codes[0]);
+            });
+
+            const delletrageDisabledReason = computed(() => {
+                if (vm.loading) return 'Enregistrement en cours...';
+                if (vm.selectedLines.length < 2)
+                    return 'Sélectionnez au moins 2 lignes (débit et crédit).';
+                if (vm.difference > 0.01)
+                    return 'Écart de ' + fmt(vm.difference) + ' — le débit et le crédit doivent être équilibrés.';
+                if (!selectedLinesHaveSameCode.value)
+                    return 'Sélectionnez uniquement des lignes ayant le même code de lettrage.';
+                return '';
             });
 
             function onCompteChange() {
@@ -100,6 +131,7 @@
                 if (!vm.hasAppliedFilters) return;
                 vm.loading = true;
                 vm.selectedLines = [];
+                computeSelection();
 
                 try {
                     const params = new URLSearchParams({
@@ -140,15 +172,38 @@
 
             function toggleAll(e) {
                 vm.selectedLines = e.target.checked ? vm.lines.map(l => l.ID) : [];
+                computeSelection();
+            }
+
+            function computeSelection() {
+                vm.totalDebitSelected = 0;
+                vm.totalCreditSelected = 0;
+
+                vm.lines.forEach(l => {
+                    if (vm.selectedLines.includes(l.ID)) {
+                        vm.totalDebitSelected += parseFloat(l.DEBIT || 0);
+                        vm.totalCreditSelected += parseFloat(l.CREDIT || 0);
+                    }
+                });
+
+                vm.difference = Math.abs(vm.totalDebitSelected - vm.totalCreditSelected);
             }
 
             function clearSelection() {
                 vm.selectedLines = [];
+                computeSelection();
             }
 
             // ⭐ Exécution du délettrage
             async function performDelletrage() {
-                if (vm.selectedLines.length === 0) return;
+                if (!canDelletrage.value) {
+                    Swal.fire({
+                        icon: 'warning',
+                        title: 'Délettrage impossible',
+                        text: delletrageDisabledReason.value
+                    });
+                    return;
+                }
 
                 const conf = await Swal.fire({
                     title: 'Confirmer le délettrage',
@@ -230,10 +285,11 @@
 
             return {
                 vm, filters, lookup, isAllSelected, filteredAuxiliaires,
+                canDelletrage, delletrageDisabledReason,
                 fmt, formatDate,
                 onCompteChange, resetFilterModal,
                 applyFilters, openFilterModal, closeFilterModal,
-                toggleAll, clearSelection, performDelletrage, goToPage
+                toggleAll, computeSelection, clearSelection, performDelletrage, goToPage
             };
         }
     };

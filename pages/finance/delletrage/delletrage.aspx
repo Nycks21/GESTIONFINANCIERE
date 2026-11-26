@@ -136,19 +136,36 @@
                     <div class="lettrage-action-bar" v-if="vm.selectedLines.length > 0">
                       <div class="lettrage-info">
                         <div class="lettrage-stat">
-                          <span class="stat-label">Lignes sélectionnées</span>
-                          <span class="stat-value" style="color:var(--s-primary);">{{ vm.selectedLines.length }}</span>
+                          <span class="stat-label">Débit sélectionné</span>
+                          <span class="stat-value debit">{{ fmt(vm.totalDebitSelected) }}</span>
+                        </div>
+                        <div class="lettrage-stat">
+                          <span class="stat-label">Crédit sélectionné</span>
+                          <span class="stat-value credit">{{ fmt(vm.totalCreditSelected) }}</span>
+                        </div>
+                        <div class="lettrage-stat" v-if="vm.difference > 0.01">
+                          <span class="stat-label">Écart</span>
+                          <span class="stat-value text-danger">{{ fmt(vm.difference) }}</span>
                         </div>
                       </div>
                       <div class="lettrage-actions">
-                        <button type="button" class="btn btn-outline" @click="clearSelection">Annuler</button>
-                        <button type="button" class="btn" style="background:#DC2626;color:white;"
+                        <button type="button" class="btn btn-outline" @click="clearSelection">
+                          <i class="fas fa-times"></i> Annuler
+                        </button>
+                        <button type="button" class="btn btn-delettrer"
+                          :class="{ 'is-disabled': !canDelletrage }" :disabled="!canDelletrage"
+                          :title="canDelletrage ? 'Délettrer la sélection' : delletrageDisabledReason"
                           @click="performDelletrage">
                           <i class="fas fa-unlink"></i> Délettrer la sélection
                         </button>
                       </div>
                     </div>
                   </transition>
+
+                  <div class="lettrage-warning" v-if="vm.selectedLines.length > 0 && !canDelletrage">
+                    <i class="fas fa-exclamation-triangle"></i>
+                    {{ delletrageDisabledReason }}
+                  </div>
 
                   <div class="pagination-bar" v-if="vm.hasAppliedFilters && vm.total > 0">
                     <span class="pagination-summary">Page {{ vm.page }} / {{ vm.totalPages }}</span>

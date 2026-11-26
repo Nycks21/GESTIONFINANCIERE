@@ -10,15 +10,29 @@ function _esc(s) {
 }
 
 // ════════════════════════════════════════════════════════════
-// HELPER — visibilité conditionnelle de la case « Restreindre trésorerie »
-//   - Visible uniquement si CODE commence par "4" (spec §3)
-//   - Quand masquée, on force le décochage pour éviter des valeurs fantômes
+// HELPERS — visibilité conditionnelle des options
 // ════════════════════════════════════════════════════════════
+
+// Option 1 : Restreindre trésorerie (CODE commence par "4" selon spec §3)
 function _syncRestrictionTresoVisibilite(code, checked) {
     var grp = document.getElementById('grpRestrictionTreso');
     var chk = document.getElementById('elementRestreindreTreso');
     if (!grp || !chk) return;
     var concerne = typeof code === 'string' && code.charAt(0) === '4';
+    grp.style.display = concerne ? '' : 'none';
+    chk.checked = concerne ? !!checked : false;
+}
+
+// Option 2 : Lettrable (FIX: Ajout de la fonction manquante)
+function _syncLettrableVisibilite(code, checked) {
+    var grp = document.getElementById('grpLettrable');
+    var chk = document.getElementById('elementLettrable');
+    if (!grp || !chk) return;
+
+    // ⚠️ À ADAPTER : Définissez ici la règle métier (ex: commence par "6").
+    // Pour l'instant, mis à true par défaut pour toujours l'afficher.
+    var concerne = true;
+
     grp.style.display = concerne ? '' : 'none';
     chk.checked = concerne ? !!checked : false;
 }
@@ -229,7 +243,7 @@ function openAddElementModal(e) {
 
     populateParentSelect((AppState.currentLevel || 1) - 1, null);
 
-    // ─── grpAuxiliaire (logique existante, non modifiée) ───
+    // ─── grpAuxiliaire ───
     var planNiveau = (AppState.plan && AppState.plan.NIVEAU) ? AppState.plan.NIVEAU : 1;
     var grpAux = document.getElementById('grpAuxiliaire');
     var chkAux = document.getElementById('elementAuxiliaire');
@@ -238,14 +252,23 @@ function openAddElementModal(e) {
         grpAux.style.display = ((AppState.currentLevel || 1) === planNiveau) ? '' : 'none';
     }
 
-    // ─── grpRestrictionTreso (nouvelle option) ───
+    // ─── grpRestrictionTreso ───
     _syncRestrictionTresoVisibilite('', false);
+
+    // ─── grpLettrable (Initialisation) ───
+    _syncLettrableVisibilite('', false);
+
+    // ─── Écouteur dynamique sur le champ CODE ───
     var codeEl = document.getElementById('elementCode');
     if (codeEl && !codeEl._rtBound) {
         codeEl._rtBound = true;
         codeEl.addEventListener('input', function () {
-            var chk = document.getElementById('elementRestreindreTreso');
-            _syncRestrictionTresoVisibilite(codeEl.value || '', chk ? chk.checked : false);
+            var chkRt = document.getElementById('elementRestreindreTreso');
+            _syncRestrictionTresoVisibilite(codeEl.value || '', chkRt ? chkRt.checked : false);
+
+            // FIX: Mise à jour dynamique de la case Lettrable
+            var chkLet = document.getElementById('elementLettrable');
+            _syncLettrableVisibilite(codeEl.value || '', chkLet ? chkLet.checked : false);
         });
     }
 
@@ -272,7 +295,7 @@ function editElement(id) {
 
     populateParentSelect((el.NIVEAU || 1) - 1, el.PARENT_ID);
 
-    // ─── grpAuxiliaire (logique existante, non modifiée) ───
+    // ─── grpAuxiliaire ───
     var grpAux = document.getElementById('grpAuxiliaire');
     var chkAux = document.getElementById('elementAuxiliaire');
     if (grpAux && chkAux) {
@@ -286,9 +309,13 @@ function editElement(id) {
         }
     }
 
-    // ─── grpRestrictionTreso (nouvelle option) ───
+    // ─── grpRestrictionTreso ───
     _syncRestrictionTresoVisibilite(el.CODE || '', !!el.RESTREINDRE_IMPUT_TRESO);
 
+    // ─── grpLettrable ───
+    _syncLettrableVisibilite(el.CODE || '', !!el.LETTRABLE);
+
+    // FIX: Suppression des lignes dupliquées ici
     clearErrors('#elementModal');
     document.getElementById('elementModal').style.display = 'flex';
 }
@@ -327,16 +354,21 @@ async function saveElement(e) {
     var grpRt = document.getElementById('grpRestrictionTreso');
     var chkRt = document.getElementById('elementRestreindreTreso');
 
+    // FIX: Récupération des éléments de la case Lettrable
+    var grpLet = document.getElementById('grpLettrable');
+    var chkLet = document.getElementById('elementLettrable');
+
     var data = {
         id:             id,
-        planOrder:      AppState.planOrder,       // ← ORDRE
+        planOrder:      AppState.planOrder,
         code:           (document.getElementById('elementCode').value || '').trim().toUpperCase(),
         libelle:        (document.getElementById('elementLibelle').value || '').trim(),
         parentId:       (parentSel && !parentSel.disabled) ? (parentSel.value || null) : null,
         active:         document.getElementById('elementActive').checked,
         estAuxiliaire:  (grpAux && chkAux && grpAux.style.display !== 'none') ? chkAux.checked : false,
-        // Nouvelle option — le serveur force false si code ne commence pas par 4
-        restreindreImputTreso: (grpRt && chkRt && grpRt.style.display !== 'none') ? !!chkRt.checked : false
+        restreindreImputTreso: (grpRt && chkRt && grpRt.style.display !== 'none') ? !!chkRt.checked : false,
+        // FIX: Ajout de la valeur Lettrable dans l'envoi au serveur
+        lettrable: (grpLet && chkLet && grpLet.style.display !== 'none') ? !!chkLet.checked : false
     };
 
     clearErrors('#elementModal');

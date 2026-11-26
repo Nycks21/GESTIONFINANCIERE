@@ -2352,7 +2352,7 @@
   "saisie.diag.motif_treso_lock": "Treasury journal — locked on bank account",
   "saisie.hint.restrict_4xx_od_short": "Third-party account 4xxxx on OD journal: analytical allocations forbidden.",
   "saisie.hint.restrict_4xx_od_banner": "Third-party account <strong>{code}</strong> on OD journal: analytical allocations are forbidden.",
-  "menu.correction" : "Correction",
+  "menu.correction": "Correction",
   "correction.open_filters": "Edit filters",
   "correction.refresh": "Refresh results",
   "correction.count": "{n} entry(ies)",
@@ -2407,5 +2407,12 @@
   "correction.confirm_delete": "Delete this entry?",
   "correction.confirm_delete_text": "This action cannot be undone.",
   "correction.deleted": "Entry deleted.",
-  "correction.error": "Error"
+  "correction.error": "Error",
+  "elements.modal.lettrable_label": "Matchable (Lettrable)",
+  "elements.modal.lettrable_hint": "Check if this element can be reconciled.",
+  "elements.modal.restrict_treso_label": "Restrict treasury imputation",
+  "elements.modal.restrict_treso_hint": "Check to restrict imputation to the treasury.",
+  "menu.lettrage": "Account Matching",
+  "menu.delletrage": "Unmatching",
+  "section.traitement": "Processing"
 }

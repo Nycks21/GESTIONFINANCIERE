@@ -1,4 +1,4 @@
-<%@ WebHandler Language="C#" Class="EcritureDelete" %>
+﻿<%@ WebHandler Language="C#" Class="EcritureDelete" %>
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
@@ -109,8 +109,14 @@ public class EcritureDelete : IHttpHandler, IRequiresSessionState
         catch (Exception ex)
         {
             ctx.Response.StatusCode = 500;
+            var sqlEx = ex as SqlException;
+            string message = sqlEx != null &&
+                sqlEx.Number == 547 &&
+                sqlEx.Message.IndexOf("FK_FLETTRAGE_LIGNE_ECRITURE", StringComparison.OrdinalIgnoreCase) >= 0
+                    ? "Impossible de supprimer cette écriture : l’une de ses lignes est liée à un lettrage. Retirez d’abord cette ligne du lettrage associé, puis réessayez."
+                    : ex.Message;
             ctx.Response.Write(new JavaScriptSerializer().Serialize(new
-            { success = false, message = ex.Message }));
+            { success = false, message = message }));
         }
     }
 

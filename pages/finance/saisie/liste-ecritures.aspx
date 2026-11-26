@@ -198,9 +198,6 @@
                       <button type="button" class="btn btn-sm btn-primary" @click="editEcr(e.ID)">
                         <i class="fas fa-edit"></i>
                       </button>
-                      <button type="button" class="btn btn-sm btn-danger" @click="delEcr(e.ID)">
-                        <i class="fas fa-trash"></i>
-                      </button>
                     </td>
                   </tr>
 

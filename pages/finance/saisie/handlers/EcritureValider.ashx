@@ -1,4 +1,4 @@
-<%@ WebHandler Language="C#" Class="EcritureValider" %>
+﻿<%@ WebHandler Language="C#" Class="EcritureValider" %>
 using System;
 using System.Collections.Generic;
 using System.Data.SqlClient;
