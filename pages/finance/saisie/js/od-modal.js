@@ -5,7 +5,7 @@
 // ⭐ Action "Reprendre la sélection" :
 //    - Génère 2 lignes par OD
 //      • Ligne 4xxx : reprise de l'OD (contre-passation) +
-//                     REPRISE DES IMPUTATIONS PLAN2..PLAN10,
+//                     imputations PLAN2..PLAN10 de la ligne OD 2xxx/6xxx,
 //                     SOURCE_FINANCEMENT, COMPTE_ID_SUB
 //                     ⚠️ PLAN1 N'EST PAS copié de l'OD : il reste = compte choisi
 //      • Ligne 5xxx : contrepartie banque (imputations analytiques à null)
@@ -64,6 +64,13 @@ function closeOdModal() {
     _updateValidateButton();
 }
 
+function cancelOdModal() {
+    closeOdModal();
+    if (typeof window._unlockTreasuryManualLineAfterOdCancel === 'function') {
+        window._unlockTreasuryManualLineAfterOdCancel();
+    }
+}
+
 // ============================================================
 // CHARGEMENT DES DONNÉES
 // ============================================================
@@ -112,9 +119,10 @@ async function _loadOdEntries() {
 
         _odState.rows = raw.map(_normalizeRow);
 
-        // ⭐ Diagnostic : combien d'OD ont des imputations PLAN2..PLAN10 ?
+        // ⭐ Diagnostic : combien d'OD ont des imputations à reprendre ?
         var withPlans = _odState.rows.filter(function (r) {
-            for (var k = 2; k <= 10; k++) if (r.plans[k]) return true;
+            var plans = _getImputationSource(r);
+            for (var k = 2; k <= 10; k++) if (plans[k]) return true;
             return false;
         }).length;
 
@@ -153,6 +161,7 @@ function _buildOdUrl() {
     if (ctx.compteId)     params.set('compteId', ctx.compteId);
     if (ctx.auxiliaireId) params.set('auxiliaire', ctx.auxiliaireId);
     if (_odState.search)  params.set('search', _odState.search);
+    params.set('unletteredOnly', '1');
     params.set('page', '1');
     params.set('pageSize', '200');
 
@@ -161,12 +170,13 @@ function _buildOdUrl() {
 
 /**
  * ⭐ Normalise une ligne serveur en objet client.
- *    Capture TOUS les plans (PLAN1..PLAN10) dans `out.plans{}`.
+ *    Capture les plans de la ligne tiers et de la ligne OD 2xxx/6xxx.
  *    PLAN1 est capturé mais NE SERA PAS recopié vers la ligne target
  *    (voir _copyNonPrimaryImputations).
  */
 function _normalizeRow(r) {
     var id = r.ECRITURE_LIGNE_ID || r.ID || r.id || r.LIGNE_ID || r.ligneId || '';
+    var sourceImputationLineId = r.SOURCE_IMPUTATION_LINE_ID || r.sourceImputationLineId || null;
 
     var out = {
         id:                id,
@@ -186,14 +196,27 @@ function _normalizeRow(r) {
         sourceFinancement: r.SOURCE_FINANCEMENT || r.sourceFinancement || '',
         modeRegularisation: r.MODE_REGULARISATION || r.modeRegularisation || '',
         compteIdSUB:       r.COMPTE_ID_SUB || r.compteIdSUB || null,
-        plans: {}
+        plans: {},
+        sourceImputationLineId: sourceImputationLineId,
+        sourceImputationFound:  !!sourceImputationLineId,
+        sourcePlans: {}
     };
 
     for (var k = 1; k <= 10; k++) {
         var v = r['PLAN' + k];
         out.plans[k] = (v === null || v === undefined || v === '') ? null : String(v);
     }
+    for (var sourcePlan = 2; sourcePlan <= 10; sourcePlan++) {
+        var sourceValue = r['SOURCE_PLAN' + sourcePlan];
+        out.sourcePlans[sourcePlan] = (sourceValue === null || sourceValue === undefined || sourceValue === '')
+            ? null
+            : String(sourceValue);
+    }
     return out;
+}
+
+function _getImputationSource(row) {
+    return row.sourceImputationFound ? row.sourcePlans : row.plans;
 }
 
 function _normalizeSens(v) {
@@ -215,11 +238,13 @@ function _num(v) {
  */
 function _describeImputations(r) {
     var parts = [];
+    var plans = _getImputationSource(r);
     for (var k = 2; k <= 10; k++) {
-        if (r.plans[k]) parts.push('PLAN' + k + '=' + String(r.plans[k]).substring(0, 8) + '…');
+        if (plans[k]) parts.push('PLAN' + k + '=' + String(plans[k]).substring(0, 8) + '…');
     }
     if (r.sourceFinancement) parts.push('SRC=' + r.sourceFinancement);
     if (r.compteIdSUB)       parts.push('SUB=' + String(r.compteIdSUB).substring(0, 8) + '…');
+    if (r.sourceImputationFound) parts.push('imputations depuis OD 2xxx/6xxx');
     return parts.length ? parts.join(' ') : '(aucune imputation PLAN2..PLAN10)';
 }
 
@@ -401,7 +426,7 @@ function _bindModalOnce() {
     _odBound = true;
 
     var btnClose = document.getElementById('odBtnClose');
-    if (btnClose) btnClose.addEventListener('click', closeOdModal);
+    if (btnClose) btnClose.addEventListener('click', cancelOdModal);
 
     var btnRefresh = document.getElementById('odBtnRefresh');
     if (btnRefresh) btnRefresh.addEventListener('click', function () {
@@ -460,7 +485,8 @@ function _copyNonPrimaryImputations(srcRow, targetLine) {
         var ordre = Number(plan.ordre);
         if (ordre === 1) return;  // ⭐ PLAN1 exclu par conception
 
-        var planId = (srcRow.plans && srcRow.plans[ordre]) || null;
+        var sourcePlans = _getImputationSource(srcRow);
+        var planId = (sourcePlans && sourcePlans[ordre]) || null;
         targetLine['compteId' + plan.key] = planId;
         targetLine['code' + plan.key] = planId
             ? (typeof findCodeCompteByKey === 'function'

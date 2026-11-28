@@ -16,7 +16,7 @@ public class EntreeValidate : IHttpHandler, IRequiresSessionState
 
         // ✅ Sécurité CRITIQUE : Session + Token CSRF + Origin/Referer
         //    Cette action modifie SSTOCK et MSTOCK → protection renforcée indispensable.
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "entrees"))
         {
             ctx.Response.StatusCode = 403;
             ctx.Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");

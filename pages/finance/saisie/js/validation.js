@@ -120,8 +120,19 @@ function validateEcriture() {
     var cours    = parseMoneyFR(_getVal('ecrCours'));
 
     if (!date)     errors.push(_t('saisie.msg.date_required')     || 'La date comptable est obligatoire.');
+    if (isDatePieceAfterComptable()) {
+        errors.push(_t('saisie.msg.date_piece_after_comptable')
+            || 'La date de pièce doit être antérieure ou égale à la date comptable.');
+    }
     if (!journal)  errors.push(_t('saisie.msg.journal_required')  || 'Le journal est obligatoire.');
-    if (!exercice) errors.push(_t('saisie.msg.exercice_required') || 'L\'exercice est obligatoire.');
+    if (!exercice) {
+        if (date && typeof findExerciceIdByDate === 'function' && !findExerciceIdByDate(date)) {
+            errors.push(_t('saisie.msg.exercice_unavailable')
+                || 'L’exercice correspondant à cette date est clôturé ou n’existe pas.');
+        } else {
+            errors.push(_t('saisie.msg.exercice_required') || 'L\'exercice est obligatoire.');
+        }
+    }
     if (!devise)   errors.push(_t('saisie.msg.devise_required')   || 'La devise est obligatoire.');
     if (!cours || cours <= 0) errors.push(_t('saisie.msg.exchange_rate_required') || 'Le cours de devise doit être supérieur à zéro.');
 
@@ -130,7 +141,10 @@ function validateEcriture() {
     }
     if (date && exercice) {
         var ex = (AppState.exercices || []).find(function (x) { return x.ID === exercice; });
-        if (ex && (date < ex.DATE_DEBUT || date > ex.DATE_FIN)) {
+        if (!ex) {
+            errors.push(_t('saisie.msg.exercice_unavailable')
+                || 'L’exercice sélectionné est clôturé ou n’existe pas.');
+        } else if (date < ex.DATE_DEBUT || date > ex.DATE_FIN) {
             errors.push(_t('saisie.msg.date_outside_exercice') || 'La date comptable doit appartenir à l\'exercice sélectionné.');
         }
     }
@@ -158,10 +172,44 @@ function validateEcriture() {
     return { valid: errors.length === 0, errors: errors, equilibre: eq };
 }
 
+function isDatePieceAfterComptable() {
+    var date = _getVal('ecrDate');
+    var datePiece = _getVal('ecrDatePiece');
+    return !!(date && datePiece && datePiece > date);
+}
+
+function showDatePieceOrderAlert(includeExerciceUnavailable) {
+    var messages = [
+        _t('saisie.msg.date_piece_after_comptable')
+            || 'La date de pièce doit être antérieure ou égale à la date comptable.'
+    ];
+    if (includeExerciceUnavailable) {
+        messages.push(_t('saisie.msg.exercice_unavailable')
+            || 'L’exercice correspondant à cette date est clôturé ou n’existe pas. Choisissez un exercice ouvert.');
+    }
+
+    return Swal.fire({
+        icon: 'warning',
+        title: _t('saisie.msg.validation_error') || 'Erreur de validation',
+        html: '<ul style="text-align:left;padding-left:20px;">'
+            + messages.map(function (message) {
+                return '<li>' + escapeHtml(message) + '</li>';
+            }).join('')
+            + '</ul>',
+        customClass: { container: 'date-order-alert-container' },
+        confirmButtonText: _t('button.ok') || 'OK',
+        allowOutsideClick: false,
+        allowEscapeKey: false,
+        returnFocus: false
+    });
+}
+
 // ============================================================
 // EXPOSITIONS
 // ============================================================
 window.validateEcriture      = validateEcriture;
 window.checkEquilibre        = checkEquilibre;
 window.updateSaveButtonState = updateSaveButtonState;
+window.isDatePieceAfterComptable = isDatePieceAfterComptable;
+window.showDatePieceOrderAlert = showDatePieceOrderAlert;
 window._roundMoney           = _roundMoney;

@@ -2019,8 +2019,10 @@
   "saisie.msg.deleted": "Entry deleted",
   "saisie.msg.validation_error": "Validation error",
   "saisie.msg.date_required": "Accounting date is required",
+  "saisie.msg.date_piece_after_comptable": "The document date must be on or before the accounting date.",
   "saisie.msg.journal_required": "Journal is required",
   "saisie.msg.exercice_required": "Fiscal year is required",
+  "saisie.msg.exercice_unavailable": "The fiscal year for this date is closed or does not exist. Select an open fiscal year.",
   "saisie.msg.periode_required": "Period is required",
   "saisie.msg.devise_required": "Currency is required",
   "saisie.msg.libelle_required": "Label is required",
@@ -2414,5 +2416,8 @@
   "elements.modal.restrict_treso_hint": "Check to restrict imputation to the treasury.",
   "menu.lettrage": "Account Matching",
   "menu.delletrage": "Unmatching",
-  "section.traitement": "Processing"
+  "section.traitement": "Processing",
+  "saisie.col.sub": "Subsidy",
+  "menu.liste": "List of Entries",
+  "saisie.msg.no_line_selected": "No line selected."
 }

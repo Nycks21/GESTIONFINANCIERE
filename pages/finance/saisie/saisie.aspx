@@ -170,6 +170,10 @@
                               inputmode="decimal" value="1" placeholder="4 500,00000000"
                               maxlength="24" autocomplete="off" />
                           </div>
+                          <div class="eh-field">
+                            <label data-i18n="saisie.col.sub"></label>
+                            <select id="ecrSub" class="form-control"></select>
+                          </div>
                         </div>
                       </section>
 
@@ -285,7 +289,7 @@
                       </table>
 
                       <div class="ligne-actions">
-                        <button type="button" class="la-btn la-validate" onclick="validateLigne()"
+                        <button type="button" id="btnValidateLigne" class="la-btn la-validate" onclick="validateLigne()"
                           data-i18n-attr="title:saisie.action.validate_line">
                           <i class="fas fa-check"></i>
                         </button>

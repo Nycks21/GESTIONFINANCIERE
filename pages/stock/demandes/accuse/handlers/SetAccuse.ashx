@@ -23,7 +23,7 @@ public class SetAccuse : IHttpHandler, IRequiresSessionState
 
         // ✅ 2. Sécurité CRITIQUE : Session + Token CSRF + Origin/Referer
         //    Cette action clôture une sortie (statut VALIDE → TERMINE).
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "accuses"))
         {
             ctx.Response.StatusCode = 403;
             WriteJson(ctx, false, "Accès non autorisé");

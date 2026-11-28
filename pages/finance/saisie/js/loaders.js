@@ -364,7 +364,11 @@ function populateAuxiliaireOptions(filterByPlanElementId, preserveValue) {
 // ============================================================
 // PÉRIODES
 // ============================================================
+var periodesLoadRequestId = 0;
+var lastExerciceWarningDate = '';
+
 async function loadPeriodes(exerciceId) {
+    var requestId = ++periodesLoadRequestId;
     AppState.periodes = [];
     AppState.periodesExerciceId = '';
     if (!exerciceId) return;
@@ -382,13 +386,73 @@ async function loadPeriodes(exerciceId) {
 
         var data = JSON.parse(text);
         if (!data.success) throw new Error(data.message || 'Impossible de charger les périodes.');
+        if (requestId !== periodesLoadRequestId) return;
         AppState.periodes = data.periodes || [];
         AppState.periodesExerciceId = String(exerciceId);
         console.log('[loadPeriodes] ' + AppState.periodes.length + ' période(s) chargée(s)');
     } catch (err) {
+        if (requestId !== periodesLoadRequestId) return;
         console.error('[loadPeriodes] Erreur :', err);
         throw err;
     }
+}
+
+function findExerciceIdByDate(dateStr) {
+    var date = String(dateStr || '').substring(0, 10);
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) return '';
+
+    var exercice = (AppState.exercices || []).find(function (item) {
+        var debut = String(item.DATE_DEBUT || '').substring(0, 10);
+        var fin = String(item.DATE_FIN || '').substring(0, 10);
+        return debut && fin && date >= debut && date <= fin;
+    });
+    return exercice ? String(exercice.ID || '') : '';
+}
+
+function showExerciceUnavailableAlert() {
+    return Swal.fire({
+        icon: 'warning',
+        title: _t('saisie.msg.validation_error') || 'Erreur de validation',
+        text: _t('saisie.msg.exercice_unavailable')
+            || 'L’exercice correspondant à cette date est clôturé ou n’existe pas. Choisissez un exercice ouvert.',
+        confirmButtonText: _t('button.ok') || 'OK',
+        allowOutsideClick: false,
+        allowEscapeKey: false
+    });
+}
+
+async function syncExerciceFromDate(dateStr) {
+    var date = String(dateStr || '').substring(0, 10);
+    var exerciceId = findExerciceIdByDate(date);
+    if (!exerciceId) {
+        _setVal('ecrExercice', '');
+        _setVal('ecrPeriode', '');
+        await loadPeriodes('');
+        if (date && lastExerciceWarningDate !== date) {
+            if (typeof isDatePieceAfterComptable !== 'function'
+                || !isDatePieceAfterComptable()) {
+                lastExerciceWarningDate = date;
+                showExerciceUnavailableAlert();
+            }
+        }
+        return '';
+    }
+    lastExerciceWarningDate = '';
+
+    if (String(_getVal('ecrExercice') || '') !== exerciceId) {
+        _setVal('ecrExercice', exerciceId);
+        _setVal('ecrPeriode', '');
+    }
+
+    if (String(AppState.periodesExerciceId || '') !== exerciceId) {
+        await loadPeriodes(exerciceId);
+    }
+
+    if (String(_getVal('ecrDate') || '').substring(0, 10) === date
+        && String(AppState.periodesExerciceId || '') === exerciceId) {
+        _setVal('ecrPeriode', findPeriodeId(date));
+    }
+    return exerciceId;
 }
 
 function findPeriodeId(dateStr) {
@@ -768,6 +832,9 @@ window.populateHeaderSelects     = populateHeaderSelects;
 window.populateAuxiliaireOptions = populateAuxiliaireOptions;
 window.loadPeriodes              = loadPeriodes;
 window.findPeriodeId             = findPeriodeId;
+window.findExerciceIdByDate      = findExerciceIdByDate;
+window.syncExerciceFromDate      = syncExerciceFromDate;
+window.showExerciceUnavailableAlert = showExerciceUnavailableAlert;
 window.loadComptesByPlan         = loadComptesByPlan;
 window.loadAllComptesActifs      = loadAllComptesActifs;
 window.loadEcritures             = loadEcritures;

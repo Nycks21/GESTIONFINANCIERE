@@ -14,7 +14,7 @@ public class ArticlesDelete : IHttpHandler, IRequiresSessionState
         ctx.Response.Cache.SetNoStore();
 
         // ✅ Sécurité renforcée : Session + Token CSRF + Origin/Referer
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "articles"))
         {
             ctx.Response.StatusCode = 403;
             WriteJson(ctx, new {

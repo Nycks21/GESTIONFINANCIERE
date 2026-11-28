@@ -15,7 +15,7 @@ public class ArticlesAdd : IHttpHandler, IRequiresSessionState
         ctx.Response.Charset = "utf-8";
         ctx.Response.Cache.SetNoStore();
 
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "articles"))
         {
             ctx.Response.StatusCode = 403;
             WriteJson(ctx, new {

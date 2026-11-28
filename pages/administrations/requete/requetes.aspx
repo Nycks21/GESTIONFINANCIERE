@@ -99,8 +99,8 @@
 
                     <div class="dash-card-body">
                       <div class="alert alert-danger">
-                        <i class="fas fa-exclamation-triangle"></i> <strong>Attention :</strong> Toute
-                        commande exécutée impacte directement la base de données de production.
+                        <i class="fas fa-exclamation-triangle"></i> Seules les requêtes prédéfinies en lecture seule
+                        sont autorisées. Exemple : <code>SELECT USERNAME, NOM, EMAIL FROM USERS</code>.
                       </div>
 
                       <div class="mb-3">
@@ -114,7 +114,8 @@
                       </div>
 
                       <!-- Éditeur de texte style "Dark Mode" -->
-                      <textarea id="sqlConsole" class="form-control" rows="8" placeholder="Ex: SELECT * FROM NomTABLE"
+                      <textarea id="sqlConsole" class="form-control" rows="8"
+                        placeholder="Saisissez une requête prédéfinie en lecture seule."
                         style="font-family:'Consolas',monospace; background:#1e1e1e; color:#d4d4d4; padding:15px; resize:vertical; min-height:150px; width:100%; box-sizing:border-box;"></textarea>
 
                       <div class="mt-2 text-right">

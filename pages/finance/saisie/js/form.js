@@ -11,6 +11,14 @@
 // VERROUILLAGE INITIAL DES CHAMPS DETAIL
 // ============================================================
 window._detailLocked = false;
+window._lineEditLocked = false;
+
+function _hasDetailHeaderPrerequisites() {
+    return ['ecrSite', 'ecrJournal', 'ecrDate', 'ecrDatePiece'].every(function (id) {
+        var field = document.getElementById(id);
+        return !!(field && String(field.value || '').trim());
+    });
+}
 
 function _lockAllDetailFields() {
     ['flSub', 'flMode', 'flLibelle', 'flMontantLocal', 'flMontantRep', 'flEcheance']
@@ -30,6 +38,12 @@ function _lockAllDetailFields() {
 }
 
 function _unlockAllDetailFields() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return;
+    }
+
     ['flSub', 'flMode', 'flLibelle', 'flMontantLocal', 'flMontantRep', 'flEcheance']
         .forEach(function (id) {
             var el = document.getElementById(id);
@@ -42,9 +56,23 @@ function _unlockAllDetailFields() {
             if (el) { el.disabled = false; el.style.backgroundColor = ''; el.style.cursor = ''; }
         });
     }
+    if (typeof _applyPlanRestrictionToDom === 'function') {
+        _applyPlanRestrictionToDom();
+    }
+    if (typeof _applyJournalPlan1Lock === 'function') {
+        _applyJournalPlan1Lock();
+    }
+    if (_isOdManualEntryUnlockActive()) {
+        _lockTreasuryAnalyticFields();
+    }
 }
 
 function _lockOnlyCompte() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return;
+    }
     _lockAllDetailFields();
     var primaire = getPrimaryPlanField();
     if (!primaire) return;
@@ -53,6 +81,11 @@ function _lockOnlyCompte() {
 }
 
 function _lockOnlyAuxiliaire() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return;
+    }
     _lockAllDetailFields();
     var aux = document.getElementById('flAux');
     if (aux) { aux.disabled = false; aux.style.backgroundColor = ''; aux.style.cursor = ''; }
@@ -63,7 +96,82 @@ function _lockOnlyAuxiliaire() {
     }
 }
 
+function _lockTreasuryAnalyticFields() {
+    if (typeof getActivePlanFields !== 'function') return;
+    getActivePlanFields().forEach(function (plan) {
+        if (Number(plan.ordre) <= 1) return;
+        var el = document.getElementById(plan.selectId);
+        if (!el) return;
+        el.disabled = true;
+        el.classList.add('is-disabled');
+        el.style.backgroundColor = '#e9ecef';
+        el.style.cursor = 'not-allowed';
+        el.setAttribute('title', 'Les imputations analytiques restent désactivées sur ce journal de trésorerie.');
+    });
+}
+
+function _unlockTreasuryManualLineAfterOdCancel() {
+    if (!_hasDetailHeaderPrerequisites()
+        || window._lineEditLocked
+        || AppState.selectedLigneIndex >= 0
+        || typeof _isTreasuryJournal !== 'function'
+        || !_isTreasuryJournal()) {
+        return false;
+    }
+
+    var primaire = getPrimaryPlanField();
+    if (!primaire) return false;
+    var compteId = _getVal(primaire.selectId);
+    var compte = compteId ? _findCompteByPlanAndId(primaire.ordre, compteId) : null;
+    if (!compte || String(compte.CODE || '').charAt(0) !== '4') return false;
+
+    window._odManualEntryUnlockedFor = {
+        compteId: String(compteId),
+        journalId: String(_getVal('ecrJournal') || '')
+    };
+    window._detailLocked = false;
+    _unlockAllDetailFields();
+    return true;
+}
+
+function _isOdManualEntryUnlockActive() {
+    var manualUnlock = window._odManualEntryUnlockedFor;
+    if (!manualUnlock) return false;
+
+    var primaire = getPrimaryPlanField();
+    var compteId = primaire ? String(_getVal(primaire.selectId) || '') : '';
+    var compte = primaire && compteId
+        ? _findCompteByPlanAndId(primaire.ordre, compteId)
+        : null;
+    var active = !!(
+        compte
+        && String(compte.CODE || '').charAt(0) === '4'
+        && manualUnlock.compteId === compteId
+        && manualUnlock.journalId === String(_getVal('ecrJournal') || '')
+        && typeof _isTreasuryJournal === 'function'
+        && _isTreasuryJournal()
+        && AppState.selectedLigneIndex < 0
+    );
+    if (!active) window._odManualEntryUnlockedFor = null;
+    return active;
+}
+
 function setDetailLock(locked) {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return;
+    }
+
+    if (window._lineEditLocked) {
+        window._detailLocked = true;
+        if (typeof _applyJournalPlan1Lock === 'function') {
+            _applyJournalPlan1Lock();
+        }
+        _lockAllDetailFields();
+        return;
+    }
+
     window._detailLocked = !!locked;
     if (locked) {
         _lockAllDetailFields();
@@ -84,6 +192,23 @@ function setDetailLock(locked) {
     }
 }
 
+function setLineEditLocked(locked) {
+    window._lineEditLocked = !!locked;
+    if (window._lineEditLocked) {
+        setDetailLock(true);
+    } else {
+        setDetailLock(false);
+    }
+    _syncLineEditActions();
+}
+
+function _syncLineEditActions() {
+    var validateButton = document.getElementById('btnValidateLigne');
+    if (validateButton) {
+        validateButton.disabled = !!(AppState.editingId && window._lineEditLocked);
+    }
+}
+
 // ============================================================
 // ⭐ PATCH A.3 — Auto-bank TRESO
 //    Si la dernière ligne est une charge (6xxx / 2xxx / 3xxx),
@@ -92,6 +217,11 @@ function setDetailLock(locked) {
 //    Cas 2 (dernière = 4xxx) → pas d'auto-bank → saisie multiple 4xxx.
 // ============================================================
 function _maybeAutoBankForTreasury() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return false;
+    }
     if (typeof _isTreasuryJournal !== 'function' || !_isTreasuryJournal()) return false;
     if (!AppState.lignes || AppState.lignes.length === 0) return false;
 
@@ -161,6 +291,12 @@ function _maybeAutoBankForTreasury() {
 // Déverrouillage conditionnel par préfixe de compte PLAN1
 // ============================================================
 function _applyLockByComptePrefix() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return true;
+    }
+
     // ⭐ PATCH A.1 : seulement si l'utilisateur ÉDITE une ligne existante
     if (AppState.selectedLigneIndex >= 0) {
         return false;
@@ -179,6 +315,8 @@ function _applyLockByComptePrefix() {
 
     var code = String(compte.CODE || '');
     var prefix = code.charAt(0);
+    var treasury = typeof _isTreasuryJournal === 'function' && _isTreasuryJournal();
+    var manualUnlockActive = _isOdManualEntryUnlockActive();
 
     // Cas 1 : compte 2 / 3 / 6 → tous les champs SAUF auxiliaire
     if (prefix === '2' || prefix === '3' || prefix === '6') {
@@ -193,8 +331,13 @@ function _applyLockByComptePrefix() {
     // Le verrou du compte 4 ne concerne que les journaux de trésorerie :
     // un journal OD doit pouvoir enregistrer librement le sens et les montants.
     if (prefix === '4') {
-        if (typeof _isTreasuryJournal !== 'function' || !_isTreasuryJournal()) {
+        if (!treasury) {
             return false;
+        }
+        if (manualUnlockActive) {
+            _unlockAllDetailFields();
+            window._detailLocked = false;
+            return true;
         }
         _lockOnlyAuxiliaire();
         if (!compte.EST_AUXILIAIRE) {
@@ -213,21 +356,40 @@ function _applyLockByComptePrefix() {
 // Applique l'état de verrouillage selon le contexte
 // ============================================================
 function applyDetailLockByContext() {
-    var journal = _getVal('ecrJournal');
-    if (!journal) { setDetailLock(true); return; }
-
-    // ⭐ PATCH A.2 : auto-bank AVANT le check "lines > 0"
-    if (_maybeAutoBankForTreasury()) return;
-
-    if (AppState.lignes && AppState.lignes.length > 0) {
-        setDetailLock(false);
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
         return;
     }
 
-    if (_applyLockByComptePrefix()) return;
+    if (window._lineEditLocked) {
+        setDetailLock(true);
+        return;
+    }
+
+    var journal = _getVal('ecrJournal');
+    if (!journal) { setDetailLock(true); _applyJournalPlan1Lock(); return; }
+
+    if (_isOdManualEntryUnlockActive()) {
+        _applyLockByComptePrefix();
+        _applyJournalPlan1Lock();
+        return;
+    }
+
+    // ⭐ PATCH A.2 : auto-bank AVANT le check "lines > 0"
+    if (_maybeAutoBankForTreasury()) { _applyJournalPlan1Lock(); return; }
+
+    if (AppState.lignes && AppState.lignes.length > 0) {
+        setDetailLock(false);
+        _applyJournalPlan1Lock();
+        return;
+    }
+
+    if (_applyLockByComptePrefix()) { _applyJournalPlan1Lock(); return; }
 
     if (typeof _isTreasuryJournal !== 'function' || !_isTreasuryJournal()) {
         setDetailLock(false);
+        _applyJournalPlan1Lock();
         return;
     }
 
@@ -238,6 +400,7 @@ function applyDetailLockByContext() {
     } else {
         setDetailLock(true);
     }
+    _applyJournalPlan1Lock();
 }
 
 // Wrapper pour respecter le verrou après refreshPlanRestrictionUI
@@ -247,23 +410,49 @@ function applyDetailLockByContext() {
 
     window.refreshPlanRestrictionUI = function () {
         _orig.apply(this, arguments);
-        if (window._inUnlockProcess) return;
-
-        if (AppState.lignes && AppState.lignes.length > 0) {
-            setDetailLock(false);
+        if (!_hasDetailHeaderPrerequisites()) {
+            window._detailLocked = true;
+            _lockAllDetailFields();
+            return;
+        }
+        if (window._inUnlockProcess) {
+            _applyJournalPlan1Lock();
+            if (_isOdManualEntryUnlockActive()) {
+                _lockTreasuryAnalyticFields();
+            }
             return;
         }
 
-        if (_applyLockByComptePrefix()) return;
+        if (window._lineEditLocked) {
+            window._detailLocked = true;
+            _applyJournalPlan1Lock();
+            _lockAllDetailFields();
+            return;
+        }
 
-        if (!window._detailLocked) return;
+        if (_isOdManualEntryUnlockActive()) {
+            _applyLockByComptePrefix();
+            _applyJournalPlan1Lock();
+            return;
+        }
+
+        if (AppState.lignes && AppState.lignes.length > 0) {
+            setDetailLock(false);
+            _applyJournalPlan1Lock();
+            return;
+        }
+
+        if (_applyLockByComptePrefix()) { _applyJournalPlan1Lock(); return; }
+
+        if (!window._detailLocked) { _applyJournalPlan1Lock(); return; }
 
         var treasury = typeof _isTreasuryJournal === 'function' && _isTreasuryJournal();
-        if (!treasury) return;
+        if (!treasury) { _applyJournalPlan1Lock(); return; }
 
         var ref = _getVal('ecrReference');
         if (ref && ref.trim()) { _lockOnlyCompte(); }
         else { _lockAllDetailFields(); }
+        _applyJournalPlan1Lock();
     };
 })();
 
@@ -272,6 +461,7 @@ function applyDetailLockByContext() {
 // ============================================================
 function newLigne() {
     AppState.selectedLigneIndex = -1;
+    if (AppState.editingId) setLineEditLocked(false);
     clearFormLigne();
     renderGrid();
 
@@ -286,6 +476,7 @@ function newLigne() {
 }
 
 function clearFormLigne() {
+    window._odManualEntryUnlockedFor = null;
     getActivePlanFields().forEach(function (plan) { _setVal(plan.selectId, ''); });
     ['flAux', 'flSub', 'flMode', 'flLibelle', 'flEcheance'].forEach(function (id) { _setVal(id, ''); });
     _setVal('flMontantLocal', '0');
@@ -294,6 +485,9 @@ function clearFormLigne() {
     var rd = document.querySelector('input[name="flSens"][value="D"]');
     if (rd) rd.checked = true;
 
+    if (typeof _applyJournalPlan1Lock === 'function') {
+        _applyJournalPlan1Lock();
+    }
     if (typeof refreshAuxiliaireField === 'function') refreshAuxiliaireField({ preserveValue: false });
 
     AppState.lastLigneSnapshot = null;
@@ -306,10 +500,20 @@ function clearFormLigne() {
 
 function clearCurrentLigne() {
     AppState.selectedLigneIndex = -1;
+    if (AppState.editingId) setLineEditLocked(true);
     clearFormLigne();
+    renderGrid();
 }
 
 function undoLigne() {
+    if (AppState.editingId && AppState.selectedLigneIndex >= 0) {
+        var selectedIndex = AppState.selectedLigneIndex;
+        loadLigneIntoForm(selectedIndex);
+        setLineEditLocked(true);
+        AppState.lastLigneSnapshot = null;
+        return;
+    }
+
     if (AppState.lastLigneSnapshot) {
         var snap = AppState.lastLigneSnapshot;
         Object.keys(snap).forEach(function (k) {
@@ -324,6 +528,7 @@ function undoLigne() {
         if (typeof refreshPlanRestrictionUI === 'function') refreshPlanRestrictionUI();
     } else {
         clearFormLigne();
+        if (AppState.editingId) setLineEditLocked(true);
     }
 }
 
@@ -340,9 +545,15 @@ function editCurrentLigne() {
     if (AppState.selectedLigneIndex < 0) { showErrorToast(_t('saisie.msg.no_line_selected')); return; }
     takeSnapshot();
     loadLigneIntoForm(AppState.selectedLigneIndex);
+    if (AppState.editingId) setLineEditLocked(false);
 }
 
 function validateLigne() {
+    if (AppState.editingId && AppState.selectedLigneIndex >= 0
+        && window._lineEditLocked) {
+        return;
+    }
+
     var primaire = getPrimaryPlanField();
     if (primaire) {
         var compteId = _getVal(primaire.selectId);
@@ -386,16 +597,28 @@ function validateLigne() {
         ligne['code' + plan.key] = val ? findCodeCompteByKey(plan.key, val) : '';
     });
 
-    if (AppState.selectedLigneIndex >= 0) {
+    var editingExistingLine = AppState.selectedLigneIndex >= 0;
+    if (editingExistingLine) {
         AppState.lignes[AppState.selectedLigneIndex] = ligne;
     } else {
         AppState.lignes.push(ligne);
+    }
+
+    if (AppState.editingId && editingExistingLine) {
+        var savedIndex = AppState.selectedLigneIndex;
+        renderGrid();
+        computeTotaux();
+        loadLigneIntoForm(savedIndex);
+        setLineEditLocked(true);
+        if (typeof markDirty === 'function') markDirty();
+        return;
     }
 
     AppState.selectedLigneIndex = -1;
     renderGrid();
     computeTotaux();
     clearFormLigne();
+    if (AppState.editingId) setLineEditLocked(true);
     if (typeof markDirty === 'function') markDirty();
 }
 
@@ -403,6 +626,7 @@ function deleteCurrentLigne() {
     if (AppState.selectedLigneIndex < 0) { showErrorToast(_t('saisie.msg.no_line_selected')); return; }
     AppState.lignes.splice(AppState.selectedLigneIndex, 1);
     AppState.selectedLigneIndex = -1;
+    if (AppState.editingId) setLineEditLocked(true);
     renderGrid();
     computeTotaux();
     clearFormLigne();
@@ -415,6 +639,7 @@ function duplicateLigne() {
     var copy = JSON.parse(JSON.stringify(orig));
     AppState.lignes.splice(AppState.selectedLigneIndex + 1, 0, copy);
     AppState.selectedLigneIndex = AppState.selectedLigneIndex + 1;
+    if (AppState.editingId) setLineEditLocked(true);
     renderGrid();
     computeTotaux();
     if (typeof _refreshLinesCounter === 'function') _refreshLinesCounter();
@@ -577,6 +802,12 @@ function _prefillOdModalSearch(auxLabel) {
 //     équilibrer avec la banque — appel via window.addBankLineManually())
 // ============================================================
 function _addBankLineManually() {
+    if (!_hasDetailHeaderPrerequisites()) {
+        window._detailLocked = true;
+        _lockAllDetailFields();
+        return false;
+    }
+
     var primaire = getPrimaryPlanField();
     if (!primaire) return false;
 
@@ -683,6 +914,10 @@ function _initDetailLock() {
 document.addEventListener('DOMContentLoaded', _initDetailLock);
 
 document.addEventListener('change', function (e) {
+    if (e.target
+        && ['ecrSite', 'ecrJournal', 'ecrDate', 'ecrDatePiece'].indexOf(e.target.id) >= 0) {
+        applyDetailLockByContext();
+    }
     if (e.target && e.target.id === 'ecrJournal') {
         setTimeout(function () {
             _bindTreasuryUnlockOnReferenceBlur();
@@ -706,11 +941,14 @@ window.duplicateLigne       = duplicateLigne;
 window.clearFormLigne       = clearFormLigne;
 
 window.setDetailLock             = setDetailLock;
+window.setLineEditLocked         = setLineEditLocked;
 window.applyDetailLockByContext  = applyDetailLockByContext;
+window._hasDetailHeaderPrerequisites = _hasDetailHeaderPrerequisites;
 window._lockAllDetailFields      = _lockAllDetailFields;
 window._unlockAllDetailFields    = _unlockAllDetailFields;
 window._applyLockByComptePrefix  = _applyLockByComptePrefix;
 window._lockOnlyAuxiliaire       = _lockOnlyAuxiliaire;
 window._maybeAutoBankForTreasury = _maybeAutoBankForTreasury;
+window._unlockTreasuryManualLineAfterOdCancel = _unlockTreasuryManualLineAfterOdCancel;
 window.addBankLineManually       = _addBankLineManually;
 window.reopenOdModal             = _reopenOdModal;

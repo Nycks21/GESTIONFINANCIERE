@@ -26,6 +26,7 @@ const AppState = {
 
     // Édition
     editingId: null,
+    editingJournalId: null,
     lignes: [],           // Lignes en mémoire
     selectedLigneIndex: -1,
 

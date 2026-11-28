@@ -3,9 +3,9 @@
 //      (1) compte PLAN1 = 4xxxx + RESTREINDRE_IMPUT_TRESO=1 + journal CATEGORIE_JOURNAL=2
 //      (2) compte PLAN1 = 4xxxx + journal CATEGORIE_JOURNAL=1 → INCONDITIONNEL
 //      (3) compte PLAN1 = 5xxxx → INCONDITIONNEL
-// ⭐ PLAN1 : seuls les comptes 2/3/4/6 sont visibles (aucune injection auto 5xxx).
-// ⭐ PAS d'auto-sélection du compte banque : les champs « Détail de la ligne »
-//    restent grisés via form.js (applyDetailLockByContext / setDetailLock).
+// ⭐ PLAN1 : seuls les comptes 2/3/4/6 sont listés par défaut; le compte 5xxx
+//    rattaché au journal est ajouté lors de l'édition de la ligne concernée.
+// ⭐ En édition TRESO, conserver PLAN1 de la ligne : seul un compte 5xxx reste verrouillé.
 "use strict";
 function _t(k, p) {
   return typeof window.t === "function" ? window.t(k, p) : k;
@@ -155,6 +155,175 @@ function _getJournalCompteBanqueCode() {
   return "";
 }
 
+function _applyJournalPlan1Lock() {
+  var plan1 = getActivePlanFields().find(function (plan) {
+    return Number(plan.ordre) === 1;
+  });
+  if (!plan1) return false;
+
+  var journalId = String(_getVal("ecrJournal") || "");
+  var sel = document.getElementById(plan1.selectId);
+  if (!sel) return false;
+
+  function clearPlan1Lock() {
+    sel.classList.remove("is-disabled", "plan-select-locked-treso");
+    sel.removeAttribute("title");
+    sel.disabled = !!window._lineEditLocked;
+    sel.style.backgroundColor = sel.disabled ? "#e9ecef" : "";
+    sel.style.cursor = sel.disabled ? "not-allowed" : "";
+    if (sel.disabled) sel.classList.add("is-disabled");
+  }
+
+  if (typeof window._hasDetailHeaderPrerequisites === "function"
+      && !window._hasDetailHeaderPrerequisites()) {
+    sel.disabled = true;
+    sel.classList.add("is-disabled");
+    sel.style.backgroundColor = "#e9ecef";
+    sel.style.cursor = "not-allowed";
+    return false;
+  }
+
+  var journal = (AppState.journaux || []).find(function (item) {
+    return String(item.ID) === journalId;
+  });
+  if (!journal) {
+    clearPlan1Lock();
+    return false;
+  }
+
+  var linkedId =
+    Number(journal.PLAN_ORDER) === 1 && journal.COMPTE_BANQUE_ID
+      ? String(journal.COMPTE_BANQUE_ID).trim()
+      : "";
+  var journalChanged =
+    AppState.editingJournalId != null &&
+    String(AppState.editingJournalId) !== journalId;
+
+  function ensurePlan1Option(accountId) {
+    var value = String(accountId || "").trim();
+    if (!value) return;
+
+    var hasOption = Array.prototype.some.call(sel.options, function (option) {
+      return String(option.value) === value;
+    });
+    if (hasOption) return;
+
+    var compte = (AppState.comptesParPlan[1] || []).find(function (item) {
+      return String(item.ID) === value;
+    });
+    var option = document.createElement("option");
+    option.value = value;
+    option.textContent = compte
+      ? compte.CODE + " — " + compte.LIBELLE
+      : value;
+    if (compte) {
+      option.setAttribute("data-code", compte.CODE || "");
+      option.setAttribute("data-aux", compte.EST_AUXILIAIRE ? "1" : "0");
+      option.setAttribute(
+        "data-restrict",
+        compte.RESTREINDRE_IMPUT_TRESO ? "1" : "0",
+      );
+    }
+    sel.appendChild(option);
+  }
+
+  if (!AppState.editingId) {
+    var linkedAccount = (AppState.comptesParPlan[1] || []).find(
+      function (item) {
+        return String(item.ID) === linkedId;
+      },
+    );
+    var linkedCode = linkedAccount ? String(linkedAccount.CODE || "").trim() : "";
+    if (
+      linkedId &&
+      String(sel.value || "").trim() === linkedId &&
+      linkedCode.charAt(0) === "5"
+    ) {
+      sel.disabled = true;
+      sel.classList.add("is-disabled");
+      sel.style.backgroundColor = "#e2e8f0";
+      sel.style.cursor = "not-allowed";
+      sel.setAttribute(
+        "title",
+        "Compte PLAN1 5xxx rattaché au journal (non modifiable).",
+      );
+      return true;
+    }
+
+    clearPlan1Lock();
+    return false;
+  }
+
+  var isTreasuryLineEdit =
+    typeof _isTreasuryJournal === "function" &&
+    _isTreasuryJournal() &&
+    AppState.selectedLigneIndex >= 0;
+  var selectedLine = AppState.lignes[AppState.selectedLigneIndex];
+  var lineAccountId = selectedLine
+    ? String(selectedLine["compteId" + plan1.key] || "").trim()
+    : "";
+
+  // Les lignes TRESO non bancaires doivent garder leur propre compte PLAN1.
+  if (isTreasuryLineEdit) {
+    ensurePlan1Option(linkedId);
+    if (journalChanged && linkedId) {
+      sel.value = linkedId;
+    } else if (journalChanged && !linkedId) {
+      clearPlan1Lock();
+      return false;
+    }
+
+    var currentId = String(sel.value || "").trim();
+    if (!currentId && selectedLine) {
+      currentId = lineAccountId;
+    }
+
+    if (currentId) {
+      ensurePlan1Option(currentId);
+      if (String(sel.value) !== currentId) sel.value = currentId;
+    }
+
+    var currentAccount = (AppState.comptesParPlan[1] || []).find(
+      function (item) {
+        return String(item.ID) === currentId;
+      },
+    );
+    var currentCode = currentAccount ? String(currentAccount.CODE || "") : "";
+    if (!currentCode && selectedLine && currentId === lineAccountId) {
+      currentCode = String(selectedLine["code" + plan1.key] || "");
+    }
+
+    if (currentCode.trim().charAt(0) === "5") {
+      sel.disabled = true;
+      sel.classList.add("is-disabled");
+      sel.style.backgroundColor = "#e2e8f0";
+      sel.style.cursor = "not-allowed";
+      sel.setAttribute(
+        "title",
+        "Sur un journal de trésorerie, le compte PLAN1 5xxx reste verrouillé.",
+      );
+      return true;
+    }
+
+    clearPlan1Lock();
+    return false;
+  }
+
+  if (!linkedId) {
+    clearPlan1Lock();
+    return false;
+  }
+  ensurePlan1Option(linkedId);
+
+  sel.value = linkedId;
+  sel.disabled = true;
+  sel.classList.add("is-disabled");
+  sel.style.backgroundColor = "#e2e8f0";
+  sel.style.cursor = "not-allowed";
+  sel.setAttribute("title", "Compte PLAN1 rattaché au journal (non modifiable).");
+  return true;
+}
+
 // ============================================================
 // ÉVALUATION RESTRICTION
 // ============================================================
@@ -172,6 +341,15 @@ function _getPlan1CompteFromForm() {
   var compteId = _getVal(plan1.selectId);
   if (!compteId) return null;
   return _findCompteByPlanAndId(1, compteId);
+}
+
+function _isPlan1FinancialWithoutAuxiliary(compte) {
+  if (!compte || String(compte.CODE || "").trim().charAt(0) !== "5") {
+    return false;
+  }
+  return compte.EST_AUXILIAIRE !== true
+    && compte.EST_AUXILIAIRE !== 1
+    && compte.EST_AUXILIAIRE !== "1";
 }
 
 function _getPlan1RestrictionReason(compte) {
@@ -405,6 +583,10 @@ function refreshPlanRestrictionUI() {
     }
   }
 
+  if (typeof window._applyJournalPlan1Lock === "function") {
+    window._applyJournalPlan1Lock();
+  }
+
   if (typeof renderGrid === "function") {
     try {
       renderGrid();
@@ -422,6 +604,14 @@ function refreshAuxiliaireField(options) {
   var preserveValue = options.preserveValue === true;
   var auxSel = document.getElementById("flAux");
   if (!auxSel) return;
+
+  if (typeof window._hasDetailHeaderPrerequisites === "function"
+      && !window._hasDetailHeaderPrerequisites()) {
+    auxSel.disabled = true;
+    auxSel.style.backgroundColor = "#e9ecef";
+    auxSel.style.cursor = "not-allowed";
+    return;
+  }
 
   var primaire = getPrimaryPlanField();
   if (!primaire) {
@@ -461,7 +651,7 @@ function refreshAuxiliaireField(options) {
     _disableAuxField(
       auxSel,
       _t("saisie.hint.aux_no_auth", "Ce compte n'autorise pas d'auxiliaire."),
-      preserveValue,
+      _isPlan1FinancialWithoutAuxiliary(compte) ? false : preserveValue,
     );
     return;
   }
@@ -788,7 +978,15 @@ function _cellPlan(code, restricted) {
 // SÉLECTION LIGNE
 // ============================================================
 function selectLigne(idx) {
+  if (!Number.isInteger(idx) || idx < 0 || idx >= AppState.lignes.length) {
+    AppState.selectedLigneIndex = -1;
+    renderGrid();
+    return;
+  }
   AppState.selectedLigneIndex = idx;
+  if (AppState.editingId && typeof window.setLineEditLocked === "function") {
+    window.setLineEditLocked(true);
+  }
   renderGrid();
   loadLigneIntoForm(idx);
 }
@@ -797,7 +995,33 @@ function loadLigneIntoForm(idx) {
   var l = AppState.lignes[idx];
   if (!l) return;
   getActivePlanFields().forEach(function (plan) {
-    _setVal(plan.selectId, l["compteId" + plan.key] || "");
+    var accountId = l["compteId" + plan.key] || "";
+    var sel = document.getElementById(plan.selectId);
+    if (Number(plan.ordre) === 1 && accountId && sel) {
+      var hasOption = Array.prototype.some.call(sel.options, function (option) {
+        return String(option.value) === String(accountId);
+      });
+      if (!hasOption) {
+        var compte = (AppState.comptesParPlan[1] || []).find(function (item) {
+          return String(item.ID) === String(accountId);
+        });
+        var option = document.createElement("option");
+        option.value = accountId;
+        option.textContent = compte
+          ? compte.CODE + " — " + compte.LIBELLE
+          : accountId;
+        if (compte) {
+          option.setAttribute("data-code", compte.CODE || "");
+          option.setAttribute("data-aux", compte.EST_AUXILIAIRE ? "1" : "0");
+          option.setAttribute(
+            "data-restrict",
+            compte.RESTREINDRE_IMPUT_TRESO ? "1" : "0",
+          );
+        }
+        sel.appendChild(option);
+      }
+    }
+    _setVal(plan.selectId, accountId);
   });
   _setVal("flSub", l.sourceFinancement || l.compteIdSUB || "");
   _setVal("flMode", l.mode || "");
@@ -811,11 +1035,18 @@ function loadLigneIntoForm(idx) {
     r.checked = r.value === (l.sens || "D");
   });
 
+  if (typeof _applyJournalPlan1Lock === "function") {
+    _applyJournalPlan1Lock();
+  }
   refreshAuxiliaireField({ preserveValue: true });
   refreshPlanRestrictionUI();
 
   var auxSel = document.getElementById("flAux");
-  if (auxSel && l.auxiliaire) {
+  var plan1Account = _getPlan1CompteFromForm();
+  var clearFinancialAuxiliary =
+    typeof _isPlan1FinancialWithoutAuxiliary === "function" &&
+    _isPlan1FinancialWithoutAuxiliary(plan1Account);
+  if (auxSel && l.auxiliaire && !clearFinancialAuxiliary) {
     auxSel.value = l.auxiliaire;
     var selectedOption = auxSel.options[auxSel.selectedIndex];
     if (selectedOption && l.tiersId) {
@@ -834,6 +1065,15 @@ function loadLigneIntoForm(idx) {
       auxSel.value = l.auxiliaire;
     }
   }
+
+  if (window._lineEditLocked) {
+    if (typeof _applyJournalPlan1Lock === "function") {
+      _applyJournalPlan1Lock();
+    }
+    if (typeof _lockAllDetailFields === "function") {
+      _lockAllDetailFields();
+    }
+  }
 }
 
 // ============================================================
@@ -847,8 +1087,8 @@ function populatePlanSelectsForm() {
     sel.innerHTML = '<option value="">—</option>';
     var comptes = AppState.comptesParPlan[plan.ordre] || [];
 
-    // ⭐ Filtrage PLAN1 : seuls les préfixes 2, 3, 4, 6 sont autorisés.
-    //    Aucune injection du compte banque (5xxx) : il est exclu définitivement.
+    // ⭐ Filtrage PLAN1 : seuls les préfixes 2, 3, 4, 6 sont affichés par défaut.
+    //    Le compte PLAN1 rattaché au journal est ajouté séparément en mode édition.
     var isPrimary = Number(plan.ordre) === 1;
     var allowedPrefixes = window.ALLOWED_PLAN1_PREFIXES || ["2", "3", "4", "6"];
 
@@ -952,6 +1192,7 @@ window.findCodeCompteByKey = findCodeCompteByKey;
 window.refreshPlanRestrictionUI = refreshPlanRestrictionUI;
 window.afterLookupsLoaded = afterLookupsLoaded;
 window._isTreasuryJournal = _isTreasuryJournal;
+window._applyJournalPlan1Lock = _applyJournalPlan1Lock;
 window._shouldRestrictToPlan1 = _shouldRestrictToPlan1;
 window._shouldRestrictLine = _shouldRestrictLine;
 window._resolveCategorieJournal = _resolveCategorieJournal;

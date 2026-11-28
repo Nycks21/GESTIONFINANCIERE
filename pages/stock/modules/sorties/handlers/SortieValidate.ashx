@@ -16,7 +16,7 @@ public class SortieValidate : IHttpHandler, IRequiresSessionState
 
         // ✅ 1. Sécurité CRITIQUE : Session + Token CSRF + Origin/Referer
         //    Cette action DÉDUIT du stock (SSTOCK + MSTOCK) → protection obligatoire.
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "sorties"))
         {
             ctx.Response.StatusCode = 403;
             ctx.Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");

@@ -174,6 +174,26 @@ public partial class Login : Page
         catch { /* le log ne doit jamais casser la connexion */ }
     }
 
+    private void LogAuthenticationError(string operation, Exception ex)
+    {
+        string entry = string.Format(
+            "[{0:yyyy-MM-dd HH:mm:ss}] {1}{2}{3}{2}---{2}",
+            DateTime.Now,
+            operation,
+            Environment.NewLine,
+            ex);
+        try
+        {
+            string logFile = Server.MapPath("~/App_Data/login_errors.log");
+            System.IO.File.AppendAllText(logFile, entry);
+        }
+        catch (Exception logException)
+        {
+            System.Diagnostics.Trace.TraceError(
+                "Unable to write the login error log: " + logException);
+        }
+    }
+
     // ============================================================
     // RATE-LIMIT SERVEUR (indépendant de la session)
     // ============================================================
@@ -293,6 +313,7 @@ public partial class Login : Page
         int idUser, roleId;
         string nomComplet, errorMessage;
         int minutesLeft = 0;
+        bool authenticationError = false;
         bool accountNotFound = false;
         bool accountDeleted = false;
         bool accountInactive = false;
@@ -300,8 +321,16 @@ public partial class Login : Page
         if (!AuthenticateUser(usernameOrEmail, password,
                               out idUser, out roleId, out nomComplet,
                               out errorMessage, out minutesLeft,
-                              out accountNotFound, out accountDeleted, out accountInactive))
+                              out accountNotFound, out accountDeleted, out accountInactive,
+                              out authenticationError))
         {
+            if (authenticationError)
+            {
+                LogLoginAttempt(usernameOrEmail, false, "Erreur technique d'authentification.");
+                ShowError("La connexion est momentanément indisponible. Veuillez réessayer.");
+                return;
+            }
+
             if (accountNotFound)
             {
                 LogLoginAttempt(usernameOrEmail, false, "Compte inexistant - CX2100");
@@ -353,12 +382,6 @@ public partial class Login : Page
         // ════════════════════════════════════════════════════════════
         // ✅ AUTHENTIFICATION RÉUSSIE
         // ════════════════════════════════════════════════════════════
-        LogLoginAttempt(usernameOrEmail, true, "Connexion réussie");
-
-        ShowSuccessNotification("Bienvenue " + nomComplet + " !");
-        Session.Remove(SK_ATTEMPTS);
-        Session.Remove(SK_LOCKOUT_END);
-
         string newToken = Guid.NewGuid().ToString();
         string currentPC = Environment.MachineName;
 
@@ -383,9 +406,16 @@ public partial class Login : Page
         }
         catch (Exception ex)
         {
-            ShowError("❌ Erreur lors de la connexion: " + ex.Message);
+            LogAuthenticationError("Impossible de renouveler le jeton de session.", ex);
+            LogLoginAttempt(usernameOrEmail, false, "Échec technique après authentification.");
+            ShowError("La connexion est momentanément indisponible. Veuillez réessayer.");
             return;
         }
+
+        LogLoginAttempt(usernameOrEmail, true, "Connexion réussie");
+        ShowSuccessNotification("Bienvenue " + nomComplet + " !");
+        Session.Remove(SK_ATTEMPTS);
+        Session.Remove(SK_LOCKOUT_END);
 
         var classesAutorisees = "[]";
         var matieresAutorisees = "[]";
@@ -490,7 +520,8 @@ public partial class Login : Page
     private bool AuthenticateUser(string usernameOrEmail, string password,
                                   out int idUser, out int roleId, out string nomComplet,
                                   out string errorMessage, out int minutesLeft,
-                                  out bool accountNotFound, out bool accountDeleted, out bool accountInactive)
+                                  out bool accountNotFound, out bool accountDeleted, out bool accountInactive,
+                                  out bool authenticationError)
     {
         idUser = 0;
         roleId = 0;
@@ -500,6 +531,7 @@ public partial class Login : Page
         accountNotFound = false;
         accountDeleted = false;
         accountInactive = false;
+        authenticationError = false;
 
         try
         {
@@ -583,12 +615,16 @@ public partial class Login : Page
         }
         catch (SqlException sqlEx)
         {
-            errorMessage = "❌ Erreur SQL: " + sqlEx.Message;
+            LogAuthenticationError("Erreur SQL pendant l'authentification.", sqlEx);
+            errorMessage = "Une erreur est survenue pendant la connexion.";
+            authenticationError = true;
             return false;
         }
         catch (Exception ex)
         {
-            errorMessage = "❌ Erreur: " + ex.Message;
+            LogAuthenticationError("Erreur pendant l'authentification.", ex);
+            errorMessage = "Une erreur est survenue pendant la connexion.";
+            authenticationError = true;
             return false;
         }
     }

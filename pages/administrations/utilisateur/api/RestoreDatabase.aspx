@@ -174,7 +174,7 @@ protected void Page_Load(object sender, EventArgs e)
                 Response.Write(serializer.Serialize(new
                 {
                     success = false,
-                    message = restoreResult.ErrorMessage
+                    message = "La restauration a échoué. Vérifiez le fichier de sauvegarde et réessayez."
                 }));
             }
         }
@@ -195,7 +195,7 @@ protected void Page_Load(object sender, EventArgs e)
         Response.Write(serializer.Serialize(new
         {
             success = false,
-            message = "Erreur lors de la restauration : " + ex.Message
+            message = "Une erreur est survenue pendant la restauration. Veuillez réessayer."
         }));
     }
 }

@@ -20,7 +20,8 @@ public static class AuthHelperFinance
   {
     new AuthHelper.MenuItem { Code = "accueil",   Text = "menu.accueil",   Url = "/pages/accueil/index.aspx",                         Icon = "fas fa-chalkboard",       Section = "section.accueil",      Order = 1  },
     new AuthHelper.MenuItem { Code = "accueilc",  Text = "menu.accueilc",  Url = "/pages/finance/accueil/index.aspx",                 Icon = "fas fa-save",       Section = "section.applications", Order = 2  },
-    new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-pencil",   Section = "section.saisie",   Order = 4  },
+    new AuthHelper.MenuItem { Code = "saisie",      Text = "menu.saisie",      Url = "/pages/finance/saisie/saisie.aspx",         Icon = "fas fa-pencil",   Section = "section.saisie",   Order = 3  },
+    new AuthHelper.MenuItem { Code = "liste",      Text = "menu.liste",      Url = "/pages/finance/saisie/liste-ecritures.aspx",         Icon = "fas fa-list",   Section = "section.saisie",   Order = 4  },
     new AuthHelper.MenuItem { Code = "correction",      Text = "menu.correction",      Url = "/pages/finance/saisie/correction.aspx",         Icon = "fas fa-magic",   Section = "section.saisie",   Order = 5  },
     new AuthHelper.MenuItem { Code = "balance",   Text = "menu.balance",   Url = "/pages/finance/balanceGen/balance.aspx",  Icon = "fas fa-balance-scale",   Section = "section.exploitation",   Order = 6  },
     new AuthHelper.MenuItem { Code = "balanceaux",   Text = "menu.balance.aux",   Url = "/pages/finance/balanceAux/balance-auxiliaire.aspx",  Icon = "fas fa-inbox",   Section = "section.exploitation",   Order = 7  },

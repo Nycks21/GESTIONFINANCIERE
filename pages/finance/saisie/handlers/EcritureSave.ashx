@@ -68,6 +68,17 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
             DateTime dtComptable;
             if (!DateTime.TryParse(dateCmp, out dtComptable))
             { ctx.Response.Write("{\"success\":false,\"message\":\"Date comptable invalide.\"}"); return; }
+            if (!string.IsNullOrWhiteSpace(datePiece))
+            {
+                DateTime dtPiece;
+                if (!DateTime.TryParse(datePiece, out dtPiece))
+                { ctx.Response.Write("{\"success\":false,\"message\":\"Date de pièce invalide.\"}"); return; }
+                if (dtPiece.Date > dtComptable.Date)
+                {
+                    ctx.Response.Write("{\"success\":false,\"code\":\"DATE_PIECE_AFTER_COMPTABLE\",\"message\":\"La date de pièce doit être antérieure ou égale à la date comptable.\"}");
+                    return;
+                }
+            }
 
             string[] validStatuts = { "BROUILLON", "A_VALIDER", "VALIDEE" };
             if (Array.IndexOf(validStatuts, statut) < 0)
@@ -176,6 +187,9 @@ public class EcritureSave : IHttpHandler, IRequiresSessionState
                 {
                     try
                     {
+                        JournalAccountValidation.ValidatePlan1BankAccounts(
+                            conn, tx, journalId, parsedLignes);
+
                         string periodeIdFinal = EnsurePeriodeFromExercice(
                             conn, tx, exerciceId, dtComptable, userId);
 

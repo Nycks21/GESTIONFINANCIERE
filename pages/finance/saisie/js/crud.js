@@ -185,16 +185,17 @@ function _refreshPlanRestrictionSafe() {
 // ============================================================
 function newEcriture() {
     AppState.editingId = null;
+    AppState.editingJournalId = null;
     AppState.lignes = [];
     AppState.selectedLigneIndex = -1;
     AppState.lettrageSources = [];
+    if (typeof setLineEditLocked === 'function') setLineEditLocked(false);
 
     _setVal('editingId', '');
     _setVal('ecrNumero', '');
-    var now = new Date();
-    var localToday = new Date(now.getTime() - now.getTimezoneOffset() * 60000)
-        .toISOString().slice(0, 10);
-    _setVal('ecrDate', localToday);
+    _setVal('ecrDate', '');
+    _setVal('ecrExercice', '');
+    _setVal('ecrPeriode', '');
     _setVal('ecrDatePiece', '');
     _setVal('ecrReference', '');
     _setVal('ecrReferenceFacture', '');
@@ -208,17 +209,6 @@ function newEcriture() {
 
     var defaultSiteId = _getDefaultSiteId();
     if (defaultSiteId) _setVal('ecrSite', defaultSiteId);
-
-    _setVal('ecrPeriode', findPeriodeId(_getVal('ecrDate')));
-
-    if (AppState.exercices && AppState.exercices.length === 1) {
-        _setVal('ecrExercice', AppState.exercices[0].ID);
-        loadPeriodes(AppState.exercices[0].ID).then(function () {
-            _setVal('ecrPeriode', findPeriodeId(_getVal('ecrDate')));
-        }).catch(function (err) {
-            showErrorToast(err.message);
-        });
-    }
 
     clearFormLigne();
     renderGrid();
@@ -270,6 +260,7 @@ async function editEcriture(id) {
 
         var ecr = data.ecriture;
         AppState.editingId = ecr.ID;
+        AppState.editingJournalId = String(ecr.JOURNAL_ID || '');
         AppState.selectedLigneIndex = -1;
         AppState.lignes = [];
 
@@ -311,6 +302,12 @@ async function editEcriture(id) {
         });
 
         renderGrid();
+        if (AppState.lignes.length) {
+            selectLigne(0);
+        } else {
+            clearFormLigne();
+            if (typeof setLineEditLocked === 'function') setLineEditLocked(true);
+        }
         computeTotaux();
 
         if (typeof updateSaveButtonState === 'function') updateSaveButtonState();
@@ -319,6 +316,9 @@ async function editEcriture(id) {
 
         _refreshCategorieBadgeSafe();
         _refreshPlanRestrictionSafe();
+        if (typeof _applyJournalPlan1Lock === 'function') {
+            _applyJournalPlan1Lock();
+        }
 
         markClean();
     } catch (err) {
@@ -351,7 +351,10 @@ async function saveEcriture(e) {
             title: _t('saisie.msg.validation_error') || 'Erreur de validation',
             html: '<ul style="text-align:left;padding-left:20px;">'
                 + validation.errors.map(function (x) { return '<li>' + escapeHtml(x) + '</li>'; }).join('')
-                + '</ul>'
+                + '</ul>',
+            confirmButtonText: _t('button.ok') || 'OK',
+            allowOutsideClick: false,
+            allowEscapeKey: false
         });
         return;
     }
@@ -433,7 +436,16 @@ async function saveEcriture(e) {
             }, 800);
             return;
         } else {
-            showErrorToast(result.message || _t('message.error') || 'Erreur');
+            var errorMessage = result.message || _t('message.error') || 'Erreur';
+            if (result.code === 'DATE_PIECE_AFTER_COMPTABLE'
+                && typeof showDatePieceOrderAlert === 'function') {
+                showDatePieceOrderAlert();
+            } else if (/exercice introuvable ou fermé/i.test(errorMessage)
+                && typeof showExerciceUnavailableAlert === 'function') {
+                showExerciceUnavailableAlert();
+            } else {
+                showErrorToast(errorMessage);
+            }
             if (btnSave) btnSave.disabled = false;
         }
     } catch (err) {

@@ -42,11 +42,23 @@ public class ExecuteSQL : IHttpHandler, IRequiresSessionState
         context.Response.ContentType = "application/json";
         context.Response.Headers["Cache-Control"] = "no-cache";
 
-        string sqlQuery = context.Request.Form["query"];
+        string sqlQuery = (context.Request.Form["query"] ?? "").Trim();
 
         if (string.IsNullOrEmpty(sqlQuery))
         {
             SendResponse(context, false, "La requête SQL est vide.");
+            return;
+        }
+
+        bool isAllowed = Array.Exists(AllowedQueries, delegate(string allowedQuery)
+        {
+            return string.Equals(sqlQuery, allowedQuery, StringComparison.OrdinalIgnoreCase);
+        });
+        if (!isAllowed)
+        {
+            context.Response.StatusCode = 400;
+            SendResponse(context, false,
+                "Requête non autorisée. Seules les requêtes prédéfinies en lecture seule sont acceptées.");
             return;
         }
 

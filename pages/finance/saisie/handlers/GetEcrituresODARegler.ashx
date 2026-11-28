@@ -29,6 +29,11 @@ public class GetEcrituresODARegler : IHttpHandler, IRequiresSessionState
             string compteId   = (ctx.Request.QueryString["compteId"]   ?? "").Trim();
             string auxiliaire = (ctx.Request.QueryString["auxiliaire"] ?? "").Trim();
             string search     = (ctx.Request.QueryString["search"]     ?? "").Trim();
+            bool unletteredOnly = string.Equals(
+                ctx.Request.QueryString["unletteredOnly"],
+                "1",
+                StringComparison.Ordinal
+            );
 
             Guid compteGuid;
             if (string.IsNullOrEmpty(compteId) || !Guid.TryParse(compteId, out compteGuid))
@@ -64,11 +69,40 @@ public class GetEcrituresODARegler : IHttpHandler, IRequiresSessionState
                     l.PLAN1, l.PLAN2, l.PLAN3, l.PLAN4, l.PLAN5,
                     l.PLAN6, l.PLAN7, l.PLAN8, l.PLAN9, l.PLAN10,
                     l.SOURCE_FINANCEMENT,
-                    l.MODE_REGULARISATION
+                    l.MODE_REGULARISATION,
+                    odSource.ID AS SOURCE_IMPUTATION_LINE_ID,
+                    odSource.PLAN2 AS SOURCE_PLAN2,
+                    odSource.PLAN3 AS SOURCE_PLAN3,
+                    odSource.PLAN4 AS SOURCE_PLAN4,
+                    odSource.PLAN5 AS SOURCE_PLAN5,
+                    odSource.PLAN6 AS SOURCE_PLAN6,
+                    odSource.PLAN7 AS SOURCE_PLAN7,
+                    odSource.PLAN8 AS SOURCE_PLAN8,
+                    odSource.PLAN9 AS SOURCE_PLAN9,
+                    odSource.PLAN10 AS SOURCE_PLAN10
                 FROM FECRITURE_LIGNE l
                 INNER JOIN FECRITURE e ON e.ID = l.ECRITURE_ID
                 INNER JOIN FJOURNAL j ON j.ID = e.JOURNAL_ID
                 INNER JOIN VW_ALL_PLAN_ELEMENTS p ON p.ID = l.COMPTE_ID
+                OUTER APPLY (
+                    SELECT TOP (1)
+                        sourceLine.ID,
+                        sourceLine.PLAN2, sourceLine.PLAN3, sourceLine.PLAN4,
+                        sourceLine.PLAN5, sourceLine.PLAN6, sourceLine.PLAN7,
+                        sourceLine.PLAN8, sourceLine.PLAN9, sourceLine.PLAN10
+                    FROM FECRITURE_LIGNE sourceLine
+                    INNER JOIN VW_ALL_PLAN_ELEMENTS sourcePlan1
+                        ON sourcePlan1.ID = sourceLine.PLAN1
+                       AND sourcePlan1.PLAN_ORDER = 1
+                    WHERE sourceLine.ECRITURE_ID = e.ID
+                      AND sourceLine.ID <> l.ID
+                      AND LEFT(LTRIM(sourcePlan1.CODE), 1) IN ('2', '6')
+                    ORDER BY
+                        CASE WHEN sourceLine.SENS <> l.SENS
+                                  AND sourceLine.MONTANT = l.MONTANT THEN 0 ELSE 1 END,
+                        CASE WHEN sourceLine.SENS <> l.SENS THEN 0 ELSE 1 END,
+                        sourceLine.ORDRE
+                ) odSource
                 LEFT JOIN (
                     SELECT fll.ECRITURE_LIGNE_ID, SUM(fll.MONTANT_LETTRE) AS MONTANT_REGLE
                     FROM FLETTRAGE_LIGNE fll
@@ -80,10 +114,12 @@ public class GetEcrituresODARegler : IHttpHandler, IRequiresSessionState
                   AND l.COMPTE_ID = @compteId
                   AND l.LETTRABLE = 1
                   AND l.MONTANT > ISNULL(reg.MONTANT_REGLE, 0)  -- pas totalement réglé
+                  AND (@unletteredOnly = 0 OR reg.ECRITURE_LIGNE_ID IS NULL)
                   AND e.STATUT NOT IN ('ANNULEE')";
 
             var parameters = new List<SqlParameter>();
             parameters.Add(new SqlParameter("@compteId", SqlDbType.UniqueIdentifier) { Value = compteGuid });
+            parameters.Add(new SqlParameter("@unletteredOnly", SqlDbType.Bit) { Value = unletteredOnly });
 
             if (!string.IsNullOrEmpty(auxiliaire))
             {
@@ -142,10 +178,19 @@ public class GetEcrituresODARegler : IHttpHandler, IRequiresSessionState
                             d["SOLDE_RESTANT"]      = Convert.ToDecimal(r["SOLDE_RESTANT"]);
                             d["SOURCE_FINANCEMENT"] = r["SOURCE_FINANCEMENT"] == DBNull.Value ? "" : r["SOURCE_FINANCEMENT"].ToString();
                             d["MODE_REGULARISATION"] = r["MODE_REGULARISATION"] == DBNull.Value ? "" : r["MODE_REGULARISATION"].ToString();
+                            d["SOURCE_IMPUTATION_LINE_ID"] = r["SOURCE_IMPUTATION_LINE_ID"] == DBNull.Value
+                                ? null
+                                : r["SOURCE_IMPUTATION_LINE_ID"].ToString();
 
                             for (int k = 1; k <= 10; k++)
                             {
                                 d["PLAN" + k] = r["PLAN" + k] == DBNull.Value ? null : r["PLAN" + k].ToString();
+                            }
+                            for (int k = 2; k <= 10; k++)
+                            {
+                                d["SOURCE_PLAN" + k] = r["SOURCE_PLAN" + k] == DBNull.Value
+                                    ? null
+                                    : r["SOURCE_PLAN" + k].ToString();
                             }
                             lignes.Add(d);
                         }

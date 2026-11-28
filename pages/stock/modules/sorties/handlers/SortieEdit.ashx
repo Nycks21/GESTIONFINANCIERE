@@ -17,7 +17,7 @@ public class SortieEdit : IHttpHandler, IRequiresSessionState
         ctx.Response.Cache.SetNoStore();
 
         // ✅ Sécurité renforcée : Session + Token CSRF + Origin/Referer
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "sorties"))
         {
             ctx.Response.StatusCode = 403;
             ctx.Response.Write("{\"success\":false,\"message\":\"Accès non autorisé\"}");

@@ -15,7 +15,7 @@ public class EntreeEdit : IHttpHandler, IRequiresSessionState
         ctx.Response.Charset = "utf-8";
         ctx.Response.Cache.SetNoStore();
 
-        if (!AuthHelper.RequireCsrfSafePost(ctx, -1))
+        if (!AuthHelper.RequireCsrfPermission(ctx, "entrees"))
         {
             ctx.Response.StatusCode = 403;
             WriteJson(ctx, new { success = false, message = "Accès non autorisé" });

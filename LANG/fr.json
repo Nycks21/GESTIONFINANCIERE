@@ -2025,8 +2025,10 @@
   "saisie.msg.deleted": "Écriture supprimée",
   "saisie.msg.validation_error": "Erreur de validation",
   "saisie.msg.date_required": "La date comptable est obligatoire",
+  "saisie.msg.date_piece_after_comptable": "La date de pièce doit être antérieure ou égale à la date comptable.",
   "saisie.msg.journal_required": "Le journal est obligatoire",
   "saisie.msg.exercice_required": "L'exercice est obligatoire",
+  "saisie.msg.exercice_unavailable": "L'exercice correspondant à cette date est clôturé ou n'existe pas. Choisissez un exercice ouvert.",
   "saisie.msg.periode_required": "La période est obligatoire",
   "saisie.msg.devise_required": "La devise est obligatoire",
   "saisie.msg.libelle_required": "Le libellé est obligatoire",
@@ -2422,5 +2424,8 @@
   "elements.modal.restrict_treso_hint": "Cocher pour restreindre l'imputation à la trésorerie.",
   "menu.lettrage": "Lettrage",
   "menu.delletrage": "Déllettrage",
-  "section.traitement": "Traitement"
+  "section.traitement": "Traitement",
+  "saisie.col.sub": "Subvention",
+  "menu.liste": "Liste des écritures",
+  "saisie.msg.no_line_selected": "Aucune ligne sélectionnée."
 }

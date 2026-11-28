@@ -1996,8 +1996,10 @@
   "saisie.msg.deleted": "Voafafa ny fanoratana",
   "saisie.msg.validation_error": "Nisy olana tamin'ny fanamarinana",
   "saisie.msg.date_required": "Ilaina ny daty fitantanam-bola",
+  "saisie.msg.date_piece_after_comptable": "Tokony hitovy na ho alohan'ny daty fitantanam-bola ny datin'ny taratasy.",
   "saisie.msg.journal_required": "Ilaina ny diary",
   "saisie.msg.exercice_required": "Ilaina ny taom-piasana",
+  "saisie.msg.exercice_unavailable": "Mikatona na tsy misy ny taom-piasana mifanaraka amin'io daty io. Misafidiana taom-piasana misokatra.",
   "saisie.msg.periode_required": "Ilaina ny vanim-potoana",
   "saisie.msg.devise_required": "Ilaina ny vola",
   "saisie.msg.libelle_required": "Ilaina ny lohateny",
@@ -2404,5 +2406,8 @@
   "elements.modal.restrict_treso_hint": "Tsindrio mba hametra ny fampiasana amin'ny fitantanam-bola.",
   "menu.lettrage": "Fampifandraisana",
   "menu.delletrage": "Fanafoanana",
-  "section.traitement": "Fikarakarana"
+  "section.traitement": "Fikarakarana",
+  "saisie.col.sub": "Mpamatsy",
+  "menu.liste": "Lisitry ny fanoratana",
+  "saisie.msg.no_line_selected": "Tsy misy andalana voafantina."
 }
